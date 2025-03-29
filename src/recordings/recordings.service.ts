@@ -20,8 +20,6 @@ export class RecordingsService {
   remove(id: string) {
     delete this.recordings[id];
 
-    console.log('Remove service called');
-
     return this.recordings;
   }
 }
