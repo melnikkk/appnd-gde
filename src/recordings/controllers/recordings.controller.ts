@@ -149,14 +149,17 @@ export class RecordingsController {
   async remove(@Param() { id }: DeleteRecordingDto): Promise<void> {
     try {
       const recording = await this.recordingsService.findOne(id);
+
       if (!recording) {
         throw new NotFoundException(`Recording with ID ${id} not found`);
       }
+
       await this.recordingsService.remove(id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
+
       throw new InternalServerErrorException('Failed to delete recording');
     }
   }
