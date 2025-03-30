@@ -1,11 +1,11 @@
 import { IsUUID } from 'class-validator';
 
-export class GetRecordingDto {
+export class GetRecordingRequestDto {
   @IsUUID()
   id: string;
 }
 
-export class RecordingResponseDto {
+export class GetRecordingResponseDto {
   id: string;
   name: string;
   mimeType: string;

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Recording } from './entities/recording.entity';
-import { LocalStorageService } from './services/local-storage.service';
+import { Recording } from '../entities/recording.entity';
+import { LocalStorageService } from './storage/local-storage.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()

@@ -1,9 +1,3 @@
-/*
- * TODO:
- *  1  Add request throttling
- *  2  Secure sensitive data for get recording handlers
- *  3 Provide sorting and filtering for lists
- * */
 import * as fs from 'fs';
 import { Response, Request } from 'express';
 import {
@@ -21,13 +15,20 @@ import {
   NotFoundException,
   Res,
   Req,
+  Delete,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { RecordingsService } from './recordings.service';
-import { CreateRecordingDto } from './dto/create-recording.dto';
-import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from './recordings.constants';
-import { GetRecordingDto, RecordingResponseDto } from './dto/get-recording.dto';
-import { Recording } from './entities/recording.entity';
+import { RecordingsService } from '../services/recordings.service';
+import { CreateRecordingDto } from '../dto/create-recording.dto';
+import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from '../recordings.constants';
+import {
+  GetRecordingRequestDto,
+  GetRecordingResponseDto,
+} from '../dto/get-recording.dto';
+import { Recording } from '../entities/recording.entity';
+import { DeleteRecordingDto } from '../dto/delete-recording.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -119,7 +120,9 @@ export class RecordingsController {
 
   @Get('/:id')
   @Header('X-Content-Type-Options', 'nosniff')
-  async findOne(@Param() { id }: GetRecordingDto): Promise<RecordingResponseDto> {
+  async findOne(
+    @Param() { id }: GetRecordingRequestDto,
+  ): Promise<GetRecordingResponseDto> {
     try {
       const recording = await this.recordingsService.findOne(id);
 
@@ -137,6 +140,24 @@ export class RecordingsController {
       }
 
       throw new InternalServerErrorException('Failed to fetch recording');
+    }
+  }
+
+  @Delete('/:id')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(@Param() { id }: DeleteRecordingDto): Promise<void> {
+    try {
+      const recording = await this.recordingsService.findOne(id);
+      if (!recording) {
+        throw new NotFoundException(`Recording with ID ${id} not found`);
+      }
+      await this.recordingsService.remove(id);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to delete recording');
     }
   }
 }
