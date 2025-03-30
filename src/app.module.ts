@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
-import { RecordingsModule } from './recordings/recordings.module';
-import { DatabaseModule } from './database/database.module';
-import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { Module } from '@nestjs/common';
+import { MulterModule } from '@nestjs/platform-express';
+import { RecordingsModule } from './recordings/recordings.module';
+import { DatabaseModule } from './database/database.module';
+import { MAX_UPLOADED_FILE_SIZE } from './recordings/recordings.constants';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { extname } from 'path';
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',
-        filename: (req, file, cb) => {
+        filename: (_req, file, cb) => {
           const randomName = Array(32)
             .fill(null)
             .map(() => Math.round(Math.random() * 16).toString(16))
@@ -21,7 +22,7 @@ import { extname } from 'path';
         },
       }),
       limits: {
-        fileSize: 100 * 1024 * 1024,
+        fileSize: MAX_UPLOADED_FILE_SIZE,
       },
     }),
   ],

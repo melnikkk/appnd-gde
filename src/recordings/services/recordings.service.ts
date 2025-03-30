@@ -1,9 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
 import { LocalStorageService } from './storage/local-storage.service';
 import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
 
 @Injectable()
 export class RecordingsService {
@@ -34,10 +39,6 @@ export class RecordingsService {
     return this.recordingsRepository.findOneBy({ id });
   }
 
-  getFilePath(key: string): string {
-    return this.storageService.getFilePath(key);
-  }
-
   async getSignedUrl(id: string): Promise<string> {
     const recording = await this.findOne(id);
 
@@ -51,9 +52,25 @@ export class RecordingsService {
   async remove(id: string): Promise<void> {
     const recording = await this.findOne(id);
 
-    if (recording) {
-      await this.storageService.deleteFile(recording.s3Key);
-      await this.recordingsRepository.remove(recording);
+    if (!recording) {
+      throw new NotFoundException(`Recording with ID ${id} not found`);
     }
+
+    const filePath = this.getFilePath(recording.s3Key);
+    const isRecordingSourceExists = fs.existsSync(filePath);
+
+    try {
+      if (isRecordingSourceExists) {
+        await this.storageService.deleteFile(recording.s3Key);
+      }
+
+      await this.recordingsRepository.remove(recording);
+    } catch {
+      throw new InternalServerErrorException('Failed to delete recording');
+    }
+  }
+
+  getFilePath(key: string): string {
+    return this.storageService.getFilePath(key);
   }
 }
