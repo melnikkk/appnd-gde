@@ -1,25 +1,59 @@
 import { Injectable } from '@nestjs/common';
-import { Recording, Recordings } from './recordings.interface';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Recording } from './entities/recording.entity';
+import { LocalStorageService } from './services/local-storage.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class RecordingsService {
-  private readonly recordings: Recordings = {};
+  constructor(
+    @InjectRepository(Recording)
+    private recordingsRepository: Repository<Recording>,
+    private storageService: LocalStorageService,
+  ) {}
 
-  create(recording: Recording) {
-    this.recordings[recording.id] = recording;
+  async create(file: Express.Multer.File): Promise<Recording> {
+    const fileKey = await this.storageService.saveFile(file);
+    const recording = this.recordingsRepository.create({
+      id: uuidv4(),
+      name: file.originalname,
+      s3Key: fileKey,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+    });
+
+    return this.recordingsRepository.save(recording);
   }
 
-  findAll() {
-    return this.recordings;
+  async findAll(): Promise<Array<Recording>> {
+    return this.recordingsRepository.find();
   }
 
-  findOne(id: string) {
-    return this.recordings[id];
+  async findOne(id: string): Promise<Recording | null> {
+    return this.recordingsRepository.findOneBy({ id });
   }
 
-  remove(id: string) {
-    delete this.recordings[id];
+  getFilePath(key: string): string {
+    return this.storageService.getFilePath(key);
+  }
 
-    return this.recordings;
+  async getSignedUrl(id: string): Promise<string> {
+    const recording = await this.findOne(id);
+
+    if (!recording) {
+      throw new Error('Recording not found');
+    }
+
+    return this.storageService.getFilePath(recording.s3Key);
+  }
+
+  async remove(id: string): Promise<void> {
+    const recording = await this.findOne(id);
+
+    if (recording) {
+      await this.storageService.deleteFile(recording.s3Key);
+      await this.recordingsRepository.remove(recording);
+    }
   }
 }

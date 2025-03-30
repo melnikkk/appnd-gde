@@ -4,14 +4,14 @@
  *  2  Secure sensitive data for get recording handlers
  *  3 Provide sorting and filtering for lists
  * */
-
+import * as fs from 'fs';
+import { Response, Request } from 'express';
 import {
   Controller,
   Get,
   Post,
   Body,
   Param,
-  Delete,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
@@ -19,16 +19,15 @@ import {
   InternalServerErrorException,
   Header,
   NotFoundException,
-  HttpCode,
-  HttpStatus,
+  Res,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import * as path from 'node:path';
 import { RecordingsService } from './recordings.service';
 import { CreateRecordingDto } from './dto/create-recording.dto';
 import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from './recordings.constants';
-import { GetRecordingDto } from './dto/get-recording.dto';
-import { DeleteRecordingDto } from './dto/delete-recording.dto';
+import { GetRecordingDto, RecordingResponseDto } from './dto/get-recording.dto';
+import { Recording } from './entities/recording.entity';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -42,7 +41,10 @@ export class RecordingsController {
       },
     }),
   )
-  create(@UploadedFile() file: Express.Multer.File, @Body() { id }: CreateRecordingDto) {
+  async create(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() { id }: CreateRecordingDto,
+  ): Promise<Recording> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -51,71 +53,90 @@ export class RecordingsController {
       throw new BadRequestException('Unsupported file type');
     }
 
-    const doesRecordingIdExist = this.recordingsService.findOne(id);
+    const doesRecordingIdExist = await this.recordingsService.findOne(id);
 
     if (doesRecordingIdExist) {
       throw new ConflictException('Recording ID already exists');
     }
 
     try {
-      const sanitizedFilename = path.basename(file.originalname);
-
-      // Log the file details
-      console.log('File received:', {
-        id,
-        filename: sanitizedFilename,
-        mimetype: file.mimetype,
-        size: file.size,
-      });
-
-      this.recordingsService.create({ file, id, fileName: sanitizedFilename });
-    } catch (error) {
+      return await this.recordingsService.create(file);
+    } catch {
       throw new InternalServerErrorException('Failed to save recording');
     }
+  }
 
-    return { message: 'File uploaded successfully', file };
+  @Get(':id/source')
+  async getVideoSource(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    const recording = await this.recordingsService.findOne(id);
+
+    if (!recording) {
+      throw new NotFoundException('Recording not found');
+    }
+
+    const filePath = this.recordingsService.getFilePath(recording.s3Key);
+
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Video file not found');
+    }
+
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunksize = end - start + 1;
+      const file = fs.createReadStream(filePath, { start, end });
+      const head = {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': recording.mimeType,
+      };
+      res.writeHead(206, head);
+      file.pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': recording.mimeType,
+      });
+      fs.createReadStream(filePath).pipe(res);
+    }
   }
 
   @Get()
   @Header('X-Content-Type-Options', 'nosniff')
-  findAll() {
-    return this.recordingsService.findAll();
+  async findAll(): Promise<Array<Recording>> {
+    return await this.recordingsService.findAll();
   }
 
   @Get('/:id')
   @Header('X-Content-Type-Options', 'nosniff')
-  findOne(@Param() params: GetRecordingDto) {
+  async findOne(@Param() { id }: GetRecordingDto): Promise<RecordingResponseDto> {
     try {
-      const recording = this.recordingsService.findOne(params.id);
+      const recording = await this.recordingsService.findOne(id);
 
       if (!recording) {
-        throw new NotFoundException(`Recording with ID ${params.id} not found`);
+        throw new NotFoundException(`Recording with ID ${id} not found`);
       }
 
-      // TODO: use recording DTO mapper
-      return recording;
+      return {
+        ...recording,
+        sourceUrl: `/recordings/${recording.id}/source`,
+      };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
 
       throw new InternalServerErrorException('Failed to fetch recording');
-    }
-  }
-
-  @Delete('/:id')
-  @Header('X-Content-Type-Options', 'nosniff')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param() { id }: DeleteRecordingDto) {
-    console.log('DELETE request received. Recording id: ', id);
-    try {
-      this.recordingsService.remove(id);
-
-      return;
-    } catch (error) {
-      console.error(`Failed to delete recording ${id}:`, error);
-
-      throw new InternalServerErrorException('Failed to delete recording');
     }
   }
 }
