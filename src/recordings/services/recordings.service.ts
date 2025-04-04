@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import {
   Injectable,
   InternalServerErrorException,
@@ -7,8 +8,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
 import { LocalStorageService } from './storage/local-storage.service';
-import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs';
 
 @Injectable()
 export class RecordingsService {
@@ -18,10 +17,10 @@ export class RecordingsService {
     private storageService: LocalStorageService,
   ) {}
 
-  async create(file: Express.Multer.File): Promise<Recording> {
-    const fileKey = await this.storageService.saveFile(file);
+  async create(file: Express.Multer.File, id: string): Promise<Recording> {
+    const fileKey = await this.storageService.saveFile(file, id);
     const recording = this.recordingsRepository.create({
-      id: uuidv4(),
+      id,
       name: file.originalname,
       s3Key: fileKey,
       mimeType: file.mimetype,

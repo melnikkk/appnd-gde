@@ -19,7 +19,4 @@ export class Recording {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
-
-  // @Column('int')
-  // duration: number;
 }
