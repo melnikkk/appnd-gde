@@ -61,7 +61,7 @@ export class RecordingsController {
     }
 
     try {
-      return await this.recordingsService.create(file);
+      return await this.recordingsService.create(file, id);
     } catch {
       throw new InternalServerErrorException('Failed to save recording');
     }
