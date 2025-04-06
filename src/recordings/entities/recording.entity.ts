@@ -1,4 +1,5 @@
-import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { Entity, PrimaryColumn, Column, OneToMany } from 'typeorm';
+import { RecordingEvent } from './recording-event.entity';
 
 @Entity()
 export class Recording {
@@ -19,4 +20,7 @@ export class Recording {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
+
+  @OneToMany(() => RecordingEvent, (event) => event.recording)
+  events: Array<RecordingEvent>;
 }

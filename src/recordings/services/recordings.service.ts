@@ -7,13 +7,17 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
+import { RecordingEvent } from '../entities/recording-event.entity';
 import { LocalStorageService } from './storage/local-storage.service';
+import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 
 @Injectable()
 export class RecordingsService {
   constructor(
     @InjectRepository(Recording)
     private recordingsRepository: Repository<Recording>,
+    @InjectRepository(RecordingEvent)
+    private recordingEventsRepository: Repository<RecordingEvent>,
     private storageService: LocalStorageService,
   ) {}
 
@@ -31,11 +35,16 @@ export class RecordingsService {
   }
 
   async findAll(): Promise<Array<Recording>> {
-    return this.recordingsRepository.find();
+    return this.recordingsRepository.find({
+      relations: ['events'],
+    });
   }
 
   async findOne(id: string): Promise<Recording | null> {
-    return this.recordingsRepository.findOneBy({ id });
+    return this.recordingsRepository.findOne({
+      where: { id },
+      relations: ['events'],
+    });
   }
 
   async getSignedUrl(id: string): Promise<string> {
@@ -67,6 +76,26 @@ export class RecordingsService {
     } catch {
       throw new InternalServerErrorException('Failed to delete recording');
     }
+  }
+
+  async addEvents(
+    recordingId: string,
+    events: Array<CreateRecordingEventDto>,
+  ): Promise<Array<RecordingEvent>> {
+    const recording = await this.findOne(recordingId);
+
+    if (!recording) {
+      throw new NotFoundException(`Recording with ID ${recordingId} not found`);
+    }
+
+    const recordingEvents = events.map((event) =>
+      this.recordingEventsRepository.create({
+        ...event,
+        recording,
+      }),
+    );
+
+    return this.recordingEventsRepository.save(recordingEvents);
   }
 
   getFilePath(key: string): string {

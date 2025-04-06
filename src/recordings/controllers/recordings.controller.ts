@@ -29,6 +29,7 @@ import {
 } from '../dto/get-recording.dto';
 import { Recording } from '../entities/recording.entity';
 import { DeleteRecordingDto } from '../dto/delete-recording.dto';
+import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -162,5 +163,37 @@ export class RecordingsController {
 
       throw new InternalServerErrorException('Failed to delete recording');
     }
+  }
+
+  @Post(':recordingId/events')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @HttpCode(HttpStatus.CREATED)
+  async addEvents(
+    @Param('recordingId') recordingId: string,
+    @Body() { events }: { events: Array<CreateRecordingEventDto> },
+  ): Promise<void> {
+    try {
+      await this.recordingsService.addEvents(recordingId, events);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.log(error);
+      throw new InternalServerErrorException('Failed to add events');
+    }
+  }
+
+  @Get(':recordingId/events')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async getEvents(
+    @Param('recordingId') recordingId: string,
+  ): Promise<Recording['events']> {
+    const recording = await this.recordingsService.findOne(recordingId);
+
+    if (!recording) {
+      throw new NotFoundException(`Recording with ID ${recordingId} not found`);
+    }
+
+    return recording.events;
   }
 }
