@@ -7,35 +7,63 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
+import { RecordingEvent } from '../entities/recording-event.entity';
 import { LocalStorageService } from './storage/local-storage.service';
+import { CreateRecordingDto } from '../dto/create-recording.dto';
+import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 
 @Injectable()
 export class RecordingsService {
   constructor(
     @InjectRepository(Recording)
-    private recordingsRepository: Repository<Recording>,
-    private storageService: LocalStorageService,
+    private readonly recordingsRepository: Repository<Recording>,
+    @InjectRepository(RecordingEvent)
+    private readonly recordingEventsRepository: Repository<RecordingEvent>,
+    private readonly localStorageService: LocalStorageService,
   ) {}
 
-  async create(file: Express.Multer.File, id: string): Promise<Recording> {
-    const fileKey = await this.storageService.saveFile(file, id);
+  async create(
+    createRecordingDto: CreateRecordingDto,
+    file: Express.Multer.File,
+  ): Promise<void> {
+    const { ...recordingData } = createRecordingDto;
+
     const recording = this.recordingsRepository.create({
-      id,
-      name: file.originalname,
-      s3Key: fileKey,
+      ...recordingData,
+      name: recordingData.name || file.originalname,
+      s3Key: file.originalname,
       mimeType: file.mimetype,
       fileSize: file.size,
     });
+    await this.recordingsRepository.save(recording);
 
-    return this.recordingsRepository.save(recording);
+    await this.localStorageService.saveFile(file, recording.s3Key);
+
+    // const recordingEvents = JSON.parse(events);
+
+    // if (recordingEvents.length > 0) {
+    //   console.log(typeof events, Array.isArray(events));
+    //   const recordingEvents = events.map((event) =>
+    //     this.recordingEventsRepository.create({
+    //       ...event,
+    //       recording: { id: recording.id },
+    //     }),
+    //   );
+    //   await this.recordingEventsRepository.save(recordingEvents);
+    // }
   }
 
   async findAll(): Promise<Array<Recording>> {
-    return this.recordingsRepository.find();
+    return this.recordingsRepository.find({
+      relations: ['events'],
+    });
   }
 
   async findOne(id: string): Promise<Recording | null> {
-    return this.recordingsRepository.findOneBy({ id });
+    return this.recordingsRepository.findOne({
+      where: { id },
+      relations: ['events'],
+    });
   }
 
   async getSignedUrl(id: string): Promise<string> {
@@ -45,7 +73,7 @@ export class RecordingsService {
       throw new Error('Recording not found');
     }
 
-    return this.storageService.getFilePath(recording.s3Key);
+    return this.localStorageService.getFilePath(recording.s3Key);
   }
 
   async remove(id: string): Promise<void> {
@@ -60,7 +88,7 @@ export class RecordingsService {
 
     try {
       if (isRecordingSourceExists) {
-        await this.storageService.deleteFile(recording.s3Key);
+        await this.localStorageService.deleteFile(recording.s3Key);
       }
 
       await this.recordingsRepository.remove(recording);
@@ -69,7 +97,27 @@ export class RecordingsService {
     }
   }
 
+  async addEvents(
+    recordingId: string,
+    events: Array<CreateRecordingEventDto>,
+  ): Promise<Array<RecordingEvent>> {
+    const recording = await this.findOne(recordingId);
+
+    if (!recording) {
+      throw new NotFoundException(`Recording with ID ${recordingId} not found`);
+    }
+
+    const recordingEvents = events.map((event) =>
+      this.recordingEventsRepository.create({
+        ...event,
+        recording,
+      }),
+    );
+
+    return this.recordingEventsRepository.save(recordingEvents);
+  }
+
   getFilePath(key: string): string {
-    return this.storageService.getFilePath(key);
+    return this.localStorageService.getFilePath(key);
   }
 }

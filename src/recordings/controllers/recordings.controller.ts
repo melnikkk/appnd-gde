@@ -9,7 +9,6 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
-  ConflictException,
   InternalServerErrorException,
   Header,
   NotFoundException,
@@ -29,6 +28,7 @@ import {
 } from '../dto/get-recording.dto';
 import { Recording } from '../entities/recording.entity';
 import { DeleteRecordingDto } from '../dto/delete-recording.dto';
+import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -39,32 +39,25 @@ export class RecordingsController {
     FileInterceptor('file', {
       limits: {
         fileSize: MAX_UPLOADED_FILE_SIZE,
+        fieldSize: 1024 * 1024,
       },
     }),
   )
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() { id }: CreateRecordingDto,
-  ): Promise<Recording> {
+    @Body() createRecordingDto: CreateRecordingDto,
+  ): Promise<void> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException('Unsupported file type');
+      throw new BadRequestException(
+        `Invalid file type. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
+      );
     }
 
-    const doesRecordingIdExist = await this.recordingsService.findOne(id);
-
-    if (doesRecordingIdExist) {
-      throw new ConflictException('Recording ID already exists');
-    }
-
-    try {
-      return await this.recordingsService.create(file, id);
-    } catch {
-      throw new InternalServerErrorException('Failed to save recording');
-    }
+    return this.recordingsService.create(createRecordingDto, file);
   }
 
   @Get(':id/source')
@@ -80,7 +73,7 @@ export class RecordingsController {
     }
 
     const filePath = this.recordingsService.getFilePath(recording.s3Key);
-
+   
     if (!fs.existsSync(filePath)) {
       throw new NotFoundException('Video file not found');
     }
@@ -162,5 +155,38 @@ export class RecordingsController {
 
       throw new InternalServerErrorException('Failed to delete recording');
     }
+  }
+
+  @Post(':recordingId/events')
+  @Header('X-Content-Type-Options', 'application/json')
+  @HttpCode(HttpStatus.CREATED)
+  async addEvents(
+    @Param('recordingId') recordingId: string,
+    @Body() body: { events: Array<CreateRecordingEventDto> },
+  ): Promise<void> {
+    console.log(body);
+    try {
+      await this.recordingsService.addEvents(recordingId, body.events);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.log(error);
+      throw new InternalServerErrorException('Failed to add events');
+    }
+  }
+
+  @Get(':recordingId/events')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async getEvents(
+    @Param('recordingId') recordingId: string,
+  ): Promise<Recording['events']> {
+    const recording = await this.recordingsService.findOne(recordingId);
+
+    if (!recording) {
+      throw new NotFoundException(`Recording with ID ${recordingId} not found`);
+    }
+
+    return recording.events;
   }
 }

@@ -25,7 +25,7 @@ export class LocalStorageService {
   }
 
   getFilePath(key: string): string {
-    return path.join(process.cwd(), key);
+    return path.join(this.uploadDir, key);
   }
 
   async deleteFile(key: string): Promise<void> {
