@@ -1,12 +1,22 @@
-import { IsInt, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { CreateRecordingEventDto } from './create-recording-event.dto';
 
 export class CreateRecordingDto {
   @IsUUID()
   id: string;
 
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  @IsOptional()
+  name?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -21,4 +31,9 @@ export class CreateRecordingDto {
 
   @IsInt()
   fileSize: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateRecordingEventDto)
+  events: CreateRecordingEventDto[];
 }

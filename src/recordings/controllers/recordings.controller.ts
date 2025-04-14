@@ -9,7 +9,6 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
-  ConflictException,
   InternalServerErrorException,
   Header,
   NotFoundException,
@@ -40,32 +39,25 @@ export class RecordingsController {
     FileInterceptor('file', {
       limits: {
         fileSize: MAX_UPLOADED_FILE_SIZE,
+        fieldSize: 1024 * 1024,
       },
     }),
   )
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() { id }: CreateRecordingDto,
-  ): Promise<Recording> {
+    @Body() createRecordingDto: CreateRecordingDto,
+  ): Promise<void> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException('Unsupported file type');
+      throw new BadRequestException(
+        `Invalid file type. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
+      );
     }
 
-    const doesRecordingIdExist = await this.recordingsService.findOne(id);
-
-    if (doesRecordingIdExist) {
-      throw new ConflictException('Recording ID already exists');
-    }
-
-    try {
-      return await this.recordingsService.create(file, id);
-    } catch {
-      throw new InternalServerErrorException('Failed to save recording');
-    }
+    return this.recordingsService.create(createRecordingDto, file);
   }
 
   @Get(':id/source')
@@ -81,7 +73,7 @@ export class RecordingsController {
     }
 
     const filePath = this.recordingsService.getFilePath(recording.s3Key);
-
+   
     if (!fs.existsSync(filePath)) {
       throw new NotFoundException('Video file not found');
     }
@@ -166,14 +158,15 @@ export class RecordingsController {
   }
 
   @Post(':recordingId/events')
-  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('X-Content-Type-Options', 'application/json')
   @HttpCode(HttpStatus.CREATED)
   async addEvents(
     @Param('recordingId') recordingId: string,
-    @Body() { events }: { events: Array<CreateRecordingEventDto> },
+    @Body() body: { events: Array<CreateRecordingEventDto> },
   ): Promise<void> {
+    console.log(body);
     try {
-      await this.recordingsService.addEvents(recordingId, events);
+      await this.recordingsService.addEvents(recordingId, body.events);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;

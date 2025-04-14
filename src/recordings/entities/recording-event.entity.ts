@@ -1,11 +1,7 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Recording } from './recording.entity';
+import { RecordingEventType } from './recording-event.constants';
+import { RecordingEventData } from './recording-events.types';
 
 @Entity('recording_events')
 export class RecordingEvent {
@@ -13,13 +9,13 @@ export class RecordingEvent {
   id: string;
 
   @Column('jsonb')
-  data: Record<string, any>;
+  data: RecordingEventData;
 
-  @CreateDateColumn()
-  timestamp: Date;
+  @Column({ type: 'bigint' })
+  timestamp: number;
 
   @Column()
-  type: string;
+  type: RecordingEventType;
 
   @ManyToOne(() => Recording, (recording) => recording.events)
   recording: Recording;
