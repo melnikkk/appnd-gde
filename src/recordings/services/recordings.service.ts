@@ -9,8 +9,8 @@ import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
 import { RecordingEvent } from '../entities/recording-event.entity';
 import { LocalStorageService } from './storage/local-storage.service';
-import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
+import { CreateRecordingDataDto } from '../dto/create-recording.dto';
 
 @Injectable()
 export class RecordingsService {
@@ -20,17 +20,22 @@ export class RecordingsService {
     @InjectRepository(RecordingEvent)
     private readonly recordingEventsRepository: Repository<RecordingEvent>,
     private readonly localStorageService: LocalStorageService,
-  ) {}
+  ) { }
 
   async create(
-    createRecordingDto: CreateRecordingDto,
+    dto: { data: string, id: string },
     file: Express.Multer.File,
   ): Promise<void> {
-    const { ...recordingData } = createRecordingDto;
+    const { id, data } = { id: dto.id, data: JSON.parse(dto.data) as CreateRecordingDataDto }
+
+    const recordingDuration = Number(BigInt(data.stopTime) - BigInt(data.startTime));
 
     const recording = this.recordingsRepository.create({
-      ...recordingData,
-      name: recordingData.name || file.originalname,
+      id,
+      duration: recordingDuration,
+      startTime: data.startTime,
+      stopTime: data.stopTime,
+      name: file.originalname,
       s3Key: file.originalname,
       mimeType: file.mimetype,
       fileSize: file.size,
@@ -38,19 +43,6 @@ export class RecordingsService {
     await this.recordingsRepository.save(recording);
 
     await this.localStorageService.saveFile(file, recording.s3Key);
-
-    // const recordingEvents = JSON.parse(events);
-
-    // if (recordingEvents.length > 0) {
-    //   console.log(typeof events, Array.isArray(events));
-    //   const recordingEvents = events.map((event) =>
-    //     this.recordingEventsRepository.create({
-    //       ...event,
-    //       recording: { id: recording.id },
-    //     }),
-    //   );
-    //   await this.recordingEventsRepository.save(recordingEvents);
-    // }
   }
 
   async findAll(): Promise<Array<Recording>> {

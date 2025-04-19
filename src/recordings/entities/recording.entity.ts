@@ -21,6 +21,15 @@ export class Recording {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
+  @Column({ type: 'bigint', default: () => "EXTRACT(EPOCH FROM now()) * 1000" })
+  startTime: number;
+
+  @Column({ type: 'bigint', default: () => "EXTRACT(EPOCH FROM now()) * 1000" })
+  stopTime: number;
+
+  @Column('int')
+  duration: number;
+
   @OneToMany(() => RecordingEvent, (event) => event.recording)
   events: Array<RecordingEvent>;
 }
