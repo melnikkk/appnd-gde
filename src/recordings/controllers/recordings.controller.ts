@@ -20,7 +20,6 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RecordingsService } from '../services/recordings.service';
-import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from '../recordings.constants';
 import {
   GetRecordingRequestDto,
@@ -32,7 +31,7 @@ import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
-  constructor(private readonly recordingsService: RecordingsService) {}
+  constructor(private readonly recordingsService: RecordingsService) { }
 
   @Post()
   @UseInterceptors(
@@ -45,7 +44,7 @@ export class RecordingsController {
   )
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() createRecordingDto: CreateRecordingDto,
+    @Body() body: { data: string, id: string },
   ): Promise<void> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -57,7 +56,7 @@ export class RecordingsController {
       );
     }
 
-    return this.recordingsService.create(createRecordingDto, file);
+    return this.recordingsService.create(body, file);
   }
 
   @Get(':id/source')
@@ -73,7 +72,7 @@ export class RecordingsController {
     }
 
     const filePath = this.recordingsService.getFilePath(recording.s3Key);
-   
+
     if (!fs.existsSync(filePath)) {
       throw new NotFoundException('Video file not found');
     }
@@ -164,14 +163,13 @@ export class RecordingsController {
     @Param('recordingId') recordingId: string,
     @Body() body: { events: Array<CreateRecordingEventDto> },
   ): Promise<void> {
-    console.log(body);
     try {
       await this.recordingsService.addEvents(recordingId, body.events);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.log(error);
+      
       throw new InternalServerErrorException('Failed to add events');
     }
   }
