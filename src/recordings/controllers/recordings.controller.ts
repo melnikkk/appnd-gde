@@ -29,6 +29,7 @@ import {
 import { Recording } from '../entities/recording.entity';
 import { DeleteRecordingDto } from '../dto/delete-recording.dto';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
+import { CreateRecordingDto } from '../dto/create-recording.dto';
 
 @Controller('recordings')
 export class RecordingsController {

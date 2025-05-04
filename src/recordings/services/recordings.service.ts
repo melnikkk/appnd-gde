@@ -5,14 +5,15 @@ import {
   InternalServerErrorException,
   NotFoundException,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
 import { RecordingEvent } from '../entities/recording-event.entity';
-import { LocalStorageService } from './storage/local-storage.service';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
-import { CreateRecordingDataDto } from '../dto/create-recording.dto';
+import { CreateRecordingDto } from '../dto/create-recording.dto';
+import { STORAGE_PROVIDER, StorageProvider } from '../../storage/interfaces/storage-provider.interface';
 
 @Injectable()
 export class RecordingsService {
@@ -23,8 +24,9 @@ export class RecordingsService {
     private readonly recordingsRepository: Repository<Recording>,
     @InjectRepository(RecordingEvent)
     private readonly recordingEventsRepository: Repository<RecordingEvent>,
-    private readonly localStorageService: LocalStorageService,
-  ) { }
+    @Inject(STORAGE_PROVIDER)
+    private readonly storageProvider: StorageProvider,
+  ) {}
 
   async create(
     createRecordingDto: CreateRecordingDto,
@@ -37,23 +39,24 @@ export class RecordingsService {
     const stopTime = recordingData.stopTime ? BigInt(recordingData.stopTime) : null;
     const duration = stopTime ? Number(stopTime - startTime) : 0;
 
-    const recording = this.recordingsRepository.create({
-      // @ts-expect-error: fix me
+    const recordingPartial: Partial<Recording> = {
       id,
       duration,
-      stopTime,
-      startTime,
+      startTime: Number(startTime),
+      stopTime: stopTime ? Number(stopTime) : null,
       name: file.originalname,
-      s3Key: file.originalname,
+      s3Key: id,
       mimeType: file.mimetype,
       fileSize: file.size,
-    });
+    };
+
+    const recording = this.recordingsRepository.create(recordingPartial);
 
     try {
-      await this.localStorageService.saveFile(file, recording.s3Key);
+      await this.storageProvider.saveFile(file, recording.id);
 
-      const videoPath = this.localStorageService.getFilePath(recording.s3Key);
-      const thumbnailPath = await this.localStorageService.generateThumbnail(
+      const videoPath = this.storageProvider.getFilePath(recording.s3Key);
+      const thumbnailPath = await this.storageProvider.generateThumbnail(
         videoPath,
         recording.id,
       );
@@ -63,6 +66,8 @@ export class RecordingsService {
       await this.recordingsRepository.save(recording);
     } catch (error) {
       this.logger.error(`Failed to create a recording: ${error.message}`, error.stack);
+      
+      throw new InternalServerErrorException('Failed to create recording');
     }
   }
 
@@ -83,10 +88,10 @@ export class RecordingsService {
     const recording = await this.findOne(id);
 
     if (!recording) {
-      throw new Error('Recording not found');
+      throw new NotFoundException(`Recording with ID ${id} not found`);
     }
 
-    return this.localStorageService.getFilePath(recording.s3Key);
+    return this.storageProvider.getFilePath(recording.s3Key);
   }
 
   async remove(id: string): Promise<void> {
@@ -105,7 +110,7 @@ export class RecordingsService {
       }
 
       if (isRecordingSourceExists) {
-        await this.localStorageService.deleteFile(recording.s3Key);
+        await this.storageProvider.deleteFile(recording.s3Key);
       }
 
       await this.recordingsRepository.remove(recording);
@@ -140,6 +145,6 @@ export class RecordingsService {
   }
 
   getFilePath(key: string): string {
-    return this.localStorageService.getFilePath(key);
+    return this.storageProvider.getFilePath(key);
   }
 }
