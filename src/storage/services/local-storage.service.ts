@@ -2,12 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ffmpeg from 'fluent-ffmpeg';
-// Import using require to avoid TypeScript issues
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ffmpegPath = require('ffmpeg-static');
+import ffmpegPath from 'ffmpeg-static';
+import { StorageProvider } from '../interfaces/storage-provider.interface';
 
 @Injectable()
-export class LocalStorageService {
+export class LocalStorageService implements StorageProvider {
   private readonly uploadDir: string;
   private readonly thumbnailDir: string;
   private readonly logger = new Logger(LocalStorageService.name);
@@ -15,8 +14,6 @@ export class LocalStorageService {
   constructor() {
     this.uploadDir = path.join(process.cwd(), 'uploads', 'recordings');
     this.thumbnailDir = path.join(process.cwd(), 'uploads', 'thumbnails');
-
-    this.logger.log(`FFmpeg path: ${ffmpegPath}`);
     
     if (ffmpegPath) {
       ffmpeg.setFfmpegPath(ffmpegPath);
@@ -41,14 +38,14 @@ export class LocalStorageService {
     return path.join('uploads', 'recordings', fileName);
   }
 
-  async generateThumbnail(recorindgPath: string, recordingId: string): Promise<string> {
-    const thumbnailFileName = `${recordingId}.jpg`;
+  async generateThumbnail(filePath: string, id: string): Promise<string> {
+    const thumbnailFileName = `${id}.jpg`;
     const thumbnailPath = path.join(this.thumbnailDir, thumbnailFileName);
     
     return new Promise((resolve, reject) => {
-      ffmpeg(recorindgPath)
+      ffmpeg(filePath)
         .on('error', (err) => {
-          console.error('Error generating thumbnail:', err);
+          this.logger.error(`Error generating thumbnail: ${err.message}`);
           reject(err);
         })
         .on('end', () => {

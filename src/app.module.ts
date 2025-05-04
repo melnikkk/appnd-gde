@@ -4,12 +4,14 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { RecordingsModule } from './recordings/recordings.module';
 import { DatabaseModule } from './database/database.module';
+import { StorageModule } from './storage/storage.module';
 import { MAX_UPLOADED_FILE_SIZE } from './recordings/recordings.constants';
 
 @Module({
   imports: [
     RecordingsModule,
     DatabaseModule,
+    StorageModule,
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',
