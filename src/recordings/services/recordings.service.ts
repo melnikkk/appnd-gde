@@ -1,8 +1,10 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +16,8 @@ import { CreateRecordingDataDto } from '../dto/create-recording.dto';
 
 @Injectable()
 export class RecordingsService {
+  private readonly logger = new Logger(RecordingsService.name);
+
   constructor(
     @InjectRepository(Recording)
     private readonly recordingsRepository: Repository<Recording>,
@@ -23,26 +27,43 @@ export class RecordingsService {
   ) { }
 
   async create(
-    dto: { data: string, id: string },
+    createRecordingDto: CreateRecordingDto,
     file: Express.Multer.File,
   ): Promise<void> {
-    const { id, data } = { id: dto.id, data: JSON.parse(dto.data) as CreateRecordingDataDto }
+    const { id, data } = createRecordingDto;
 
-    const recordingDuration = Number(BigInt(data.stopTime) - BigInt(data.startTime));
+    const recordingData = JSON.parse(data);
+    const startTime = BigInt(recordingData.startTime);
+    const stopTime = recordingData.stopTime ? BigInt(recordingData.stopTime) : null;
+    const duration = stopTime ? Number(stopTime - startTime) : 0;
 
     const recording = this.recordingsRepository.create({
+      // @ts-expect-error: fix me
       id,
-      duration: recordingDuration,
-      startTime: data.startTime,
-      stopTime: data.stopTime,
+      duration,
+      stopTime,
+      startTime,
       name: file.originalname,
       s3Key: file.originalname,
       mimeType: file.mimetype,
       fileSize: file.size,
     });
-    await this.recordingsRepository.save(recording);
 
-    await this.localStorageService.saveFile(file, recording.s3Key);
+    try {
+      await this.localStorageService.saveFile(file, recording.s3Key);
+
+      const videoPath = this.localStorageService.getFilePath(recording.s3Key);
+      const thumbnailPath = await this.localStorageService.generateThumbnail(
+        videoPath,
+        recording.id,
+      );
+
+      recording.thumbnailPath = path.relative(process.cwd(), thumbnailPath);
+
+      await this.recordingsRepository.save(recording);
+    } catch (error) {
+      this.logger.error(`Failed to create a recording: ${error.message}`, error.stack);
+    }
   }
 
   async findAll(): Promise<Array<Recording>> {
@@ -79,12 +100,21 @@ export class RecordingsService {
     const isRecordingSourceExists = fs.existsSync(filePath);
 
     try {
+      if (recording.events && recording.events.length > 0) {
+        await this.recordingEventsRepository.remove(recording.events);
+      }
+
       if (isRecordingSourceExists) {
         await this.localStorageService.deleteFile(recording.s3Key);
       }
 
       await this.recordingsRepository.remove(recording);
-    } catch {
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete recording ${id}: ${error.message}`,
+        error.stack,
+      );
+
       throw new InternalServerErrorException('Failed to delete recording');
     }
   }

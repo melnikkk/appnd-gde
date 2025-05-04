@@ -12,4 +12,5 @@ export class GetRecordingResponseDto {
   fileSize: number;
   createdAt: Date;
   sourceUrl: string;
+  thumbnailUrl: string | null;
 }

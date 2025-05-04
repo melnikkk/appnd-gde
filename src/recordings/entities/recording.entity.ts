@@ -18,17 +18,20 @@ export class Recording {
   @Column('int')
   fileSize: number;
 
+  @Column({ type: 'varchar', nullable: true })
+  thumbnailPath: string | null;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 
-  @Column({ type: 'bigint', default: () => "EXTRACT(EPOCH FROM now()) * 1000" })
-  startTime: number;
-
-  @Column({ type: 'bigint', default: () => "EXTRACT(EPOCH FROM now()) * 1000" })
-  stopTime: number;
-
   @Column('int')
   duration: number;
+
+  @Column('bigint')
+  startTime: number;
+
+  @Column('bigint', { nullable: true })
+  stopTime: number | null;
 
   @OneToMany(() => RecordingEvent, (event) => event.recording)
   events: Array<RecordingEvent>;

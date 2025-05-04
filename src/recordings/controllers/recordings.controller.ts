@@ -17,6 +17,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RecordingsService } from '../services/recordings.service';
@@ -31,7 +32,7 @@ import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
-  constructor(private readonly recordingsService: RecordingsService) { }
+  constructor(private readonly recordingsService: RecordingsService) {}
 
   @Post()
   @UseInterceptors(
@@ -44,7 +45,7 @@ export class RecordingsController {
   )
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { data: string, id: string },
+    @Body() createRecordingDto: CreateRecordingDto,
   ): Promise<void> {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -56,7 +57,7 @@ export class RecordingsController {
       );
     }
 
-    return this.recordingsService.create(body, file);
+    return this.recordingsService.create(createRecordingDto, file);
   }
 
   @Get(':id/source')
@@ -104,10 +105,46 @@ export class RecordingsController {
     }
   }
 
+  @Get(':id/thumbnail')
+  async getThumbnail(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const recording = await this.recordingsService.findOne(id);
+
+    if (!recording) {
+      throw new NotFoundException('Recording not found');
+    }
+
+    if (!recording.thumbnailPath) {
+      throw new NotFoundException('Thumbnail not found for this recording');
+    }
+
+    const thumbnailPath = recording.thumbnailPath;
+
+    if (!fs.existsSync(thumbnailPath)) {
+      throw new NotFoundException('Thumbnail file not found');
+    }
+
+    const file = fs.createReadStream(thumbnailPath);
+    res.set({
+      'Content-Type': 'image/jpeg',
+      'Content-Disposition': `inline; filename="${id}.jpg"`,
+    });
+
+    return new StreamableFile(file);
+  }
+
   @Get()
   @Header('X-Content-Type-Options', 'nosniff')
-  async findAll(): Promise<Array<Recording>> {
-    return await this.recordingsService.findAll();
+  async findAll(): Promise<Array<GetRecordingResponseDto>> {
+    const recordings = await this.recordingsService.findAll();
+
+    return recordings.map(({ thumbnailPath, ...recording }) => ({
+      ...recording,
+      sourceUrl: `/recordings/${recording.id}/source`,
+      thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
+    }));
   }
 
   @Get('/:id')
@@ -122,9 +159,12 @@ export class RecordingsController {
         throw new NotFoundException(`Recording with ID ${id} not found`);
       }
 
+      const { thumbnailPath, ...recordingData } = recording;
+
       return {
-        ...recording,
+        ...recordingData,
         sourceUrl: `/recordings/${recording.id}/source`,
+        thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -157,7 +197,8 @@ export class RecordingsController {
   }
 
   @Post(':recordingId/events')
-  @Header('X-Content-Type-Options', 'application/json')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Content-Type', 'application/json')
   @HttpCode(HttpStatus.CREATED)
   async addEvents(
     @Param('recordingId') recordingId: string,
@@ -169,7 +210,7 @@ export class RecordingsController {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      
+
       throw new InternalServerErrorException('Failed to add events');
     }
   }
