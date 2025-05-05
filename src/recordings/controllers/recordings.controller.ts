@@ -8,10 +8,7 @@ import {
   Param,
   UseInterceptors,
   UploadedFile,
-  BadRequestException,
-  InternalServerErrorException,
   Header,
-  NotFoundException,
   Res,
   Req,
   Delete,
@@ -30,6 +27,9 @@ import { Recording } from '../entities/recording.entity';
 import { DeleteRecordingDto } from '../dto/delete-recording.dto';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { CreateRecordingDto } from '../dto/create-recording.dto';
+import { InvalidFileUploadException } from '../exceptions/invalid-file-upload.exception';
+import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
+import { StorageException } from '../../storage/exceptions/storage.exception';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -49,13 +49,11 @@ export class RecordingsController {
     @Body() createRecordingDto: CreateRecordingDto,
   ): Promise<void> {
     if (!file) {
-      throw new BadRequestException('No file uploaded');
+      throw InvalidFileUploadException.noFile();
     }
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `Invalid file type. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
-      );
+      throw InvalidFileUploadException.invalidType();
     }
 
     return this.recordingsService.create(createRecordingDto, file);
@@ -70,13 +68,13 @@ export class RecordingsController {
     const recording = await this.recordingsService.findOne(id);
 
     if (!recording) {
-      throw new NotFoundException('Recording not found');
+      throw new RecordingNotFoundException(id);
     }
 
     const filePath = this.recordingsService.getFilePath(recording.s3Key);
 
     if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('Video file not found');
+      throw StorageException.fileNotFound(filePath);
     }
 
     const stat = fs.statSync(filePath);
@@ -114,17 +112,17 @@ export class RecordingsController {
     const recording = await this.recordingsService.findOne(id);
 
     if (!recording) {
-      throw new NotFoundException('Recording not found');
+      throw new RecordingNotFoundException(id);
     }
 
     if (!recording.thumbnailPath) {
-      throw new NotFoundException('Thumbnail not found for this recording');
+      throw StorageException.fileNotFound(`Thumbnail for recording ${id}`);
     }
 
     const thumbnailPath = recording.thumbnailPath;
 
     if (!fs.existsSync(thumbnailPath)) {
-      throw new NotFoundException('Thumbnail file not found');
+      throw StorageException.fileNotFound(thumbnailPath);
     }
 
     const file = fs.createReadStream(thumbnailPath);
@@ -153,48 +151,26 @@ export class RecordingsController {
   async findOne(
     @Param() { id }: GetRecordingRequestDto,
   ): Promise<GetRecordingResponseDto> {
-    try {
-      const recording = await this.recordingsService.findOne(id);
+    const recording = await this.recordingsService.findOne(id);
 
-      if (!recording) {
-        throw new NotFoundException(`Recording with ID ${id} not found`);
-      }
-
-      const { thumbnailPath, ...recordingData } = recording;
-
-      return {
-        ...recordingData,
-        sourceUrl: `/recordings/${recording.id}/source`,
-        thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException('Failed to fetch recording');
+    if (!recording) {
+      throw new RecordingNotFoundException(id);
     }
+
+    const { thumbnailPath, ...recordingData } = recording;
+
+    return {
+      ...recordingData,
+      sourceUrl: `/recordings/${recording.id}/source`,
+      thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
+    };
   }
 
   @Delete('/:id')
   @Header('X-Content-Type-Options', 'nosniff')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param() { id }: DeleteRecordingDto): Promise<void> {
-    try {
-      const recording = await this.recordingsService.findOne(id);
-
-      if (!recording) {
-        throw new NotFoundException(`Recording with ID ${id} not found`);
-      }
-
-      await this.recordingsService.remove(id);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException('Failed to delete recording');
-    }
+    await this.recordingsService.remove(id);
   }
 
   @Post(':recordingId/events')
@@ -205,15 +181,7 @@ export class RecordingsController {
     @Param('recordingId') recordingId: string,
     @Body() body: { events: Array<CreateRecordingEventDto> },
   ): Promise<void> {
-    try {
-      await this.recordingsService.addEvents(recordingId, body.events);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException('Failed to add events');
-    }
+    await this.recordingsService.addEvents(recordingId, body.events);
   }
 
   @Get(':recordingId/events')
@@ -224,7 +192,7 @@ export class RecordingsController {
     const recording = await this.recordingsService.findOne(recordingId);
 
     if (!recording) {
-      throw new NotFoundException(`Recording with ID ${recordingId} not found`);
+      throw new RecordingNotFoundException(recordingId);
     }
 
     return recording.events;

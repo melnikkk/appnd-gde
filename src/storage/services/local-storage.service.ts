@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 import { StorageProvider } from '../interfaces/storage-provider.interface';
+import { StorageException } from '../exceptions/storage.exception';
 
 @Injectable()
 export class LocalStorageService implements StorageProvider {
@@ -29,24 +30,35 @@ export class LocalStorageService implements StorageProvider {
   }
 
   async saveFile(file: Express.Multer.File, id: string): Promise<string> {
-    const fileExtension = path.extname(file.originalname);
-    const fileName = `${id}${fileExtension}`;
-    const filePath = path.join(this.uploadDir, fileName);
+    try {
+      const fileExtension = path.extname(file.originalname);
+      const fileName = `${id}${fileExtension}`;
+      const filePath = path.join(this.uploadDir, fileName);
 
-    await fs.promises.writeFile(filePath, file.buffer);
+      await fs.promises.writeFile(filePath, file.buffer);
 
-    return path.join('uploads', 'recordings', fileName);
+      return path.join('uploads', 'recordings', fileName);
+    } catch (error) {
+      this.logger.error(`Failed to save file: ${error.message}`, error.stack);
+
+      throw StorageException.failedToSave(error);
+    }
   }
 
   async generateThumbnail(filePath: string, id: string): Promise<string> {
     const thumbnailFileName = `${id}.jpg`;
     const thumbnailPath = path.join(this.thumbnailDir, thumbnailFileName);
     
+    if (!fs.existsSync(filePath)) {
+      throw StorageException.fileNotFound(filePath);
+    }
+    
     return new Promise((resolve, reject) => {
       ffmpeg(filePath)
         .on('error', (err) => {
-          this.logger.error(`Error generating thumbnail: ${err.message}`);
-          reject(err);
+          this.logger.error(`Error generating thumbnail: ${err.message}`, err.stack);
+
+          reject(StorageException.failedThumbnailGeneration(err));
         })
         .on('end', () => {
           resolve(thumbnailPath);
@@ -72,16 +84,22 @@ export class LocalStorageService implements StorageProvider {
   }
 
   async deleteFile(key: string): Promise<void> {
-    const filePath = this.getFilePath(key);
+    try {
+      const filePath = this.getFilePath(key);
 
-    if (fs.existsSync(filePath)) {
-      await fs.promises.unlink(filePath);
-    }
-    
-    const thumbnailPath = this.getThumbnailPath(key);
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+      }
+      
+      const thumbnailPath = this.getThumbnailPath(key);
 
-    if (fs.existsSync(thumbnailPath)) {
-      await fs.promises.unlink(thumbnailPath);
+      if (fs.existsSync(thumbnailPath)) {
+        await fs.promises.unlink(thumbnailPath);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to delete file: ${error.message}`, error.stack);
+      
+      throw StorageException.failedToDelete(key, error);
     }
   }
 }
