@@ -2,8 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   Injectable,
-  InternalServerErrorException,
-  NotFoundException,
   Logger,
   Inject,
 } from '@nestjs/common';
@@ -14,6 +12,8 @@ import { RecordingEvent } from '../entities/recording-event.entity';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { STORAGE_PROVIDER, StorageProvider } from '../../storage/interfaces/storage-provider.interface';
+import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
+import { AppBaseException } from '../../common/exceptions/base.exception';
 
 @Injectable()
 export class RecordingsService {
@@ -34,25 +34,25 @@ export class RecordingsService {
   ): Promise<void> {
     const { id, data } = createRecordingDto;
 
-    const recordingData = JSON.parse(data);
-    const startTime = BigInt(recordingData.startTime);
-    const stopTime = recordingData.stopTime ? BigInt(recordingData.stopTime) : null;
-    const duration = stopTime ? Number(stopTime - startTime) : 0;
-
-    const recordingPartial: Partial<Recording> = {
-      id,
-      duration,
-      startTime: Number(startTime),
-      stopTime: stopTime ? Number(stopTime) : null,
-      name: file.originalname,
-      s3Key: id,
-      mimeType: file.mimetype,
-      fileSize: file.size,
-    };
-
-    const recording = this.recordingsRepository.create(recordingPartial);
-
     try {
+      const recordingData = JSON.parse(data);
+      const startTime = BigInt(recordingData.startTime);
+      const stopTime = recordingData.stopTime ? BigInt(recordingData.stopTime) : null;
+      const duration = stopTime ? Number(stopTime - startTime) : 0;
+
+      const recordingPartial: Partial<Recording> = {
+        id,
+        duration,
+        startTime: Number(startTime),
+        stopTime: stopTime ? Number(stopTime) : null,
+        name: file.originalname,
+        s3Key: id,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+      };
+
+      const recording = this.recordingsRepository.create(recordingPartial);
+
       await this.storageProvider.saveFile(file, recording.id);
 
       const videoPath = this.storageProvider.getFilePath(recording.s3Key);
@@ -67,28 +67,67 @@ export class RecordingsService {
     } catch (error) {
       this.logger.error(`Failed to create a recording: ${error.message}`, error.stack);
       
-      throw new InternalServerErrorException('Failed to create recording');
+      if (error instanceof AppBaseException) {
+        throw error;
+      }
+      
+      if (error instanceof SyntaxError) {
+        throw new AppBaseException(
+          `Invalid recording data format: ${error.message}`, 
+          400, 
+          'INVALID_DATA_FORMAT'
+        );
+      }
+      
+      throw new AppBaseException(
+        'Failed to create recording',
+        500,
+        'RECORDING_CREATE_FAILED',
+        { originalError: error.message }
+      );
     }
   }
 
   async findAll(): Promise<Array<Recording>> {
-    return this.recordingsRepository.find({
-      relations: ['events'],
-    });
+    try {
+      return this.recordingsRepository.find({
+        relations: ['events'],
+      });
+    } catch (error) {
+      this.logger.error(`Failed to fetch recordings: ${error.message}`, error.stack);
+      throw new AppBaseException(
+        'Failed to fetch recordings', 
+        500, 
+        'FETCH_RECORDINGS_FAILED'
+      );
+    }
   }
 
   async findOne(id: string): Promise<Recording | null> {
-    return this.recordingsRepository.findOne({
-      where: { id },
-      relations: ['events'],
-    });
+    try {
+      const recording = await this.recordingsRepository.findOne({
+        where: { id },
+        relations: ['events'],
+      });
+      
+      return recording;
+    } catch (error) {
+      this.logger.error(`Failed to find recording ${id}: ${error.message}`, error.stack);
+
+      throw new AppBaseException(
+        `Failed to fetch recording with ID ${id}`,
+        500,
+        'FETCH_RECORDING_FAILED',
+        { recordingId: id }
+      );
+    }
   }
 
   async getSignedUrl(id: string): Promise<string> {
     const recording = await this.findOne(id);
 
     if (!recording) {
-      throw new NotFoundException(`Recording with ID ${id} not found`);
+      throw new RecordingNotFoundException(id);
     }
 
     return this.storageProvider.getFilePath(recording.s3Key);
@@ -98,7 +137,7 @@ export class RecordingsService {
     const recording = await this.findOne(id);
 
     if (!recording) {
-      throw new NotFoundException(`Recording with ID ${id} not found`);
+      throw new RecordingNotFoundException(id);
     }
 
     const filePath = this.getFilePath(recording.s3Key);
@@ -120,7 +159,16 @@ export class RecordingsService {
         error.stack,
       );
 
-      throw new InternalServerErrorException('Failed to delete recording');
+      if (error instanceof AppBaseException) {
+        throw error;
+      }
+
+      throw new AppBaseException(
+        `Failed to delete recording with ID ${id}`,
+        500,
+        'DELETE_RECORDING_FAILED',
+        { recordingId: id }
+      );
     }
   }
 
@@ -131,17 +179,31 @@ export class RecordingsService {
     const recording = await this.findOne(recordingId);
 
     if (!recording) {
-      throw new NotFoundException(`Recording with ID ${recordingId} not found`);
+      throw new RecordingNotFoundException(recordingId);
     }
 
-    const recordingEvents = events.map((event) =>
-      this.recordingEventsRepository.create({
-        ...event,
-        recording,
-      }),
-    );
+    try {
+      const recordingEvents = events.map((event) =>
+        this.recordingEventsRepository.create({
+          ...event,
+          recording,
+        }),
+      );
 
-    return this.recordingEventsRepository.save(recordingEvents);
+      return this.recordingEventsRepository.save(recordingEvents);
+    } catch (error) {
+      this.logger.error(
+        `Failed to add events to recording ${recordingId}: ${error.message}`,
+        error.stack
+      );
+      
+      throw new AppBaseException(
+        `Failed to add events to recording with ID ${recordingId}`,
+        500,
+        'ADD_EVENTS_FAILED',
+        { recordingId, eventCount: events.length }
+      );
+    }
   }
 
   getFilePath(key: string): string {
