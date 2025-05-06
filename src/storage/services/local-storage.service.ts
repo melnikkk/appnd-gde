@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from 'ffmpeg-static';
 import { StorageProvider } from '../interfaces/storage-provider.interface';
 import { StorageException } from '../exceptions/storage.exception';
+const ffmpegPath = require('ffmpeg-static');
 
 @Injectable()
 export class LocalStorageService implements StorageProvider {

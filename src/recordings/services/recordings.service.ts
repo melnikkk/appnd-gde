@@ -56,12 +56,19 @@ export class RecordingsService {
       await this.storageProvider.saveFile(file, recording.id);
 
       const videoPath = this.storageProvider.getFilePath(recording.s3Key);
-      const thumbnailPath = await this.storageProvider.generateThumbnail(
-        videoPath,
-        recording.id,
-      );
+      
+      try {
+        const thumbnailPath = await this.storageProvider.generateThumbnail(
+          videoPath,
+          recording.id,
+        );
+        
+        recording.thumbnailPath = path.relative(process.cwd(), thumbnailPath);
+      } catch (thumbnailError) {
+        this.logger.warn(`Failed to generate thumbnail for recording ${id}: ${thumbnailError.message}`, thumbnailError.stack);
 
-      recording.thumbnailPath = path.relative(process.cwd(), thumbnailPath);
+        recording.thumbnailPath = null;
+      }
 
       await this.recordingsRepository.save(recording);
     } catch (error) {
