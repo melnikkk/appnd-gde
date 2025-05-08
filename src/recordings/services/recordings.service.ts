@@ -8,12 +8,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Recording } from '../entities/recording.entity';
-import { RecordingEvent } from '../entities/recording-event.entity';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { STORAGE_PROVIDER, StorageProvider } from '../../storage/interfaces/storage-provider.interface';
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { AppBaseException } from '../../common/exceptions/base.exception';
+import { RecordingEvent } from '../entities/recording-events.types';
 
 @Injectable()
 export class RecordingsService {
@@ -22,8 +22,6 @@ export class RecordingsService {
   constructor(
     @InjectRepository(Recording)
     private readonly recordingsRepository: Repository<Recording>,
-    @InjectRepository(RecordingEvent)
-    private readonly recordingEventsRepository: Repository<RecordingEvent>,
     @Inject(STORAGE_PROVIDER)
     private readonly storageProvider: StorageProvider,
   ) {}
@@ -49,6 +47,7 @@ export class RecordingsService {
         s3Key: id,
         mimeType: file.mimetype,
         fileSize: file.size,
+        events: {},
       };
 
       const recording = this.recordingsRepository.create(recordingPartial);
@@ -97,9 +96,7 @@ export class RecordingsService {
 
   async findAll(): Promise<Array<Recording>> {
     try {
-      return this.recordingsRepository.find({
-        relations: ['events'],
-      });
+      return this.recordingsRepository.find();
     } catch (error) {
       this.logger.error(`Failed to fetch recordings: ${error.message}`, error.stack);
       throw new AppBaseException(
@@ -114,7 +111,6 @@ export class RecordingsService {
     try {
       const recording = await this.recordingsRepository.findOne({
         where: { id },
-        relations: ['events'],
       });
       
       return recording;
@@ -151,10 +147,6 @@ export class RecordingsService {
     const isRecordingSourceExists = fs.existsSync(filePath);
 
     try {
-      if (recording.events && recording.events.length > 0) {
-        await this.recordingEventsRepository.remove(recording.events);
-      }
-
       if (isRecordingSourceExists) {
         await this.storageProvider.deleteFile(recording.s3Key);
       }
@@ -181,8 +173,8 @@ export class RecordingsService {
 
   async addEvents(
     recordingId: string,
-    events: Array<CreateRecordingEventDto>,
-  ): Promise<Array<RecordingEvent>> {
+    eventsRecord: Record<string, CreateRecordingEventDto>,
+  ): Promise<Record<string, RecordingEvent>> {
     const recording = await this.findOne(recordingId);
 
     if (!recording) {
@@ -190,14 +182,18 @@ export class RecordingsService {
     }
 
     try {
-      const recordingEvents = events.map((event) =>
-        this.recordingEventsRepository.create({
-          ...event,
-          recording,
-        }),
-      );
+      if (!recording.events) {
+        recording.events = {};
+      }
 
-      return this.recordingEventsRepository.save(recordingEvents);
+      recording.events = {
+        ...recording.events,
+        ...eventsRecord
+      };
+
+      await this.recordingsRepository.save(recording);
+      
+      return recording.events;
     } catch (error) {
       this.logger.error(
         `Failed to add events to recording ${recordingId}: ${error.message}`,
@@ -208,7 +204,7 @@ export class RecordingsService {
         `Failed to add events to recording with ID ${recordingId}`,
         500,
         'ADD_EVENTS_FAILED',
-        { recordingId, eventCount: events.length }
+        { recordingId, eventCount: Object.keys(eventsRecord).length }
       );
     }
   }

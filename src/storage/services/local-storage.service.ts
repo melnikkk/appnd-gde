@@ -2,30 +2,54 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ffmpeg from 'fluent-ffmpeg';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { StorageProvider } from '../interfaces/storage-provider.interface';
 import { StorageException } from '../exceptions/storage.exception';
-const ffmpegPath = require('ffmpeg-static');
+
+const execAsync = promisify(exec);
 
 @Injectable()
 export class LocalStorageService implements StorageProvider {
   private readonly uploadDir: string;
   private readonly thumbnailDir: string;
   private readonly logger = new Logger(LocalStorageService.name);
+  private ffmpegInstalled: boolean = false;
 
   constructor() {
     this.uploadDir = path.join(process.cwd(), 'uploads', 'recordings');
     this.thumbnailDir = path.join(process.cwd(), 'uploads', 'thumbnails');
     
-    if (ffmpegPath) {
-      ffmpeg.setFfmpegPath(ffmpegPath);
-    } else {
-      this.logger.error('FFmpeg binary path not found. Thumbnail generation will not work.');
+    this.checkFfmpegInstallation().then((installed) => {
+      this.ffmpegInstalled = installed;
+
+      if (!installed) {
+        this.logger.error('FFmpeg binary path not found. Thumbnail generation will not work.');
+      } else {
+        this.logger.log('FFmpeg found. Thumbnail generation ready.');
+      }
+    });
+
+    for (const dir of [this.uploadDir, this.thumbnailDir]) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
     }
 
     for (const dir of [this.uploadDir, this.thumbnailDir]) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
+    }
+  }
+
+  async checkFfmpegInstallation(): Promise<boolean> {
+    try {
+      await execAsync('ffmpeg -version');
+
+      return true;
+    } catch (error) {
+      return false;
     }
   }
 
@@ -52,12 +76,15 @@ export class LocalStorageService implements StorageProvider {
     if (!fs.existsSync(filePath)) {
       throw StorageException.fileNotFound(filePath);
     }
-    
+
+    if (!this.ffmpegInstalled) {
+      throw StorageException.failedThumbnailGeneration(new Error('FFmpeg not installed'));
+    }
+
     return new Promise((resolve, reject) => {
       ffmpeg(filePath)
         .on('error', (err) => {
           this.logger.error(`Error generating thumbnail: ${err.message}`, err.stack);
-
           reject(StorageException.failedThumbnailGeneration(err));
         })
         .on('end', () => {

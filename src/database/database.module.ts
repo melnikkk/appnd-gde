@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Recording } from '../recordings/entities/recording.entity';
-import { RecordingEvent } from '../recordings/entities/recording-event.entity';
 
 @Module({
   imports: [
@@ -19,7 +18,7 @@ import { RecordingEvent } from '../recordings/entities/recording-event.entity';
         username: configService.get('DB_USERNAME'),
         password: configService.get('DB_PASSWORD'),
         database: configService.get('DB_NAME'),
-        entities: [Recording, RecordingEvent],
+        entities: [Recording],
         synchronize: true, // TODO: disable in production
         logging: true,
       }),

@@ -23,13 +23,13 @@ import {
   GetRecordingRequestDto,
   GetRecordingResponseDto,
 } from '../dto/get-recording.dto';
-import { Recording } from '../entities/recording.entity';
 import { DeleteRecordingDto } from '../dto/delete-recording.dto';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { InvalidFileUploadException } from '../exceptions/invalid-file-upload.exception';
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { StorageException } from '../../storage/exceptions/storage.exception';
+import { RecordingEvent } from '../entities/recording-events.types';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -179,22 +179,22 @@ export class RecordingsController {
   @HttpCode(HttpStatus.CREATED)
   async addEvents(
     @Param('recordingId') recordingId: string,
-    @Body() body: { events: Array<CreateRecordingEventDto> },
+    @Body() eventsRecord: Record<string, CreateRecordingEventDto>,
   ): Promise<void> {
-    await this.recordingsService.addEvents(recordingId, body.events);
+    await this.recordingsService.addEvents(recordingId, eventsRecord);
   }
 
   @Get(':recordingId/events')
   @Header('X-Content-Type-Options', 'nosniff')
   async getEvents(
     @Param('recordingId') recordingId: string,
-  ): Promise<Recording['events']> {
+  ): Promise<Record<string, RecordingEvent>> {
     const recording = await this.recordingsService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
     }
 
-    return recording.events;
+    return recording.events || {};
   }
 }

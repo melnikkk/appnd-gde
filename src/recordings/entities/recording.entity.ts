@@ -1,5 +1,5 @@
-import { Entity, PrimaryColumn, Column, OneToMany } from 'typeorm';
-import { RecordingEvent } from './recording-event.entity';
+import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { RecordingEventsRecord } from './recording-events.types';
 
 @Entity()
 export class Recording {
@@ -33,6 +33,6 @@ export class Recording {
   @Column('bigint', { nullable: true })
   stopTime: number | null;
 
-  @OneToMany(() => RecordingEvent, (event) => event.recording)
-  events: Array<RecordingEvent>;
+  @Column('jsonb', { nullable: true, default: {} })
+  events: RecordingEventsRecord;
 }
