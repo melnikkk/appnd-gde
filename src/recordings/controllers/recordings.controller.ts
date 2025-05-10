@@ -139,8 +139,11 @@ export class RecordingsController {
   async findAll(): Promise<Array<GetRecordingResponseDto>> {
     const recordings = await this.recordingsService.findAll();
 
-    return recordings.map(({ thumbnailPath, ...recording }) => ({
+    return recordings.map(({ thumbnailPath, startTime, stopTime, duration, ...recording }) => ({
       ...recording,
+      startTime: Number(startTime),
+      stopTime: stopTime !== null ? Number(stopTime) : null,
+      duration: Number(duration),
       sourceUrl: `/recordings/${recording.id}/source`,
       thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
     }));
@@ -157,10 +160,13 @@ export class RecordingsController {
       throw new RecordingNotFoundException(id);
     }
 
-    const { thumbnailPath, ...recordingData } = recording;
+    const { thumbnailPath, startTime, stopTime, duration, ...recordingData } = recording;
 
     return {
       ...recordingData,
+      startTime: Number(startTime),
+      stopTime: stopTime !== null ? Number(stopTime) : null,
+      duration: Number(duration),
       sourceUrl: `/recordings/${recording.id}/source`,
       thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
     };
