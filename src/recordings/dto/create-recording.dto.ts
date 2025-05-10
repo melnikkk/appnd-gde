@@ -6,10 +6,9 @@ import {
 } from 'class-validator';
 
 export class CreateRecordingDataDto {
-  @IsInt()
+  @IsNotEmpty()
   startTime: number;
 
-  @IsInt()
   stopTime: number;
 }
 

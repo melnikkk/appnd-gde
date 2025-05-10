@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsObject, IsUUID, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsObject, IsUUID, IsNumber, IsEnum } from 'class-validator';
 import { RecordingEventType } from '../entities/recording-event.constants';
 import { RecordingEventData } from '../entities/recording-events.types';
 
@@ -7,7 +7,7 @@ export class CreateRecordingEventDto {
   @IsNotEmpty()
   id: string;
 
-  @IsString()
+  @IsEnum(RecordingEventType)
   @IsNotEmpty()
   type: RecordingEventType;
 
@@ -18,4 +18,8 @@ export class CreateRecordingEventDto {
   @IsNumber()
   @IsNotEmpty()
   timestamp: number;
+  
+  @IsNumber()
+  @IsNotEmpty()
+  index: number;
 }

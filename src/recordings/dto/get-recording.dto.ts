@@ -13,4 +13,7 @@ export class GetRecordingResponseDto {
   createdAt: Date;
   sourceUrl: string;
   thumbnailUrl: string | null;
+  startTime: number;
+  stopTime: number | null;
+  duration: number;
 }
