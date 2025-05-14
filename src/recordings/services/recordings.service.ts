@@ -54,16 +54,19 @@ export class RecordingsService {
       await this.storageProvider.saveFile(file, recording.id);
 
       const videoPath = this.storageProvider.getFilePath(recording.s3Key);
-      
+
       try {
         const thumbnailPath = await this.storageProvider.generateThumbnail(
           videoPath,
           recording.id,
         );
-        
+
         recording.thumbnailPath = path.relative(process.cwd(), thumbnailPath);
       } catch (thumbnailError) {
-        this.logger.warn(`Failed to generate thumbnail for recording ${id}: ${thumbnailError.message}`, thumbnailError.stack);
+        this.logger.warn(
+          `Failed to generate thumbnail for recording ${id}: ${thumbnailError.message}`,
+          thumbnailError.stack,
+        );
 
         recording.thumbnailPath = null;
       }
@@ -172,7 +175,7 @@ export class RecordingsService {
 
   async addEvents(
     recordingId: string,
-    eventsRecord: Record<string, CreateRecordingEventDto>,
+    events: Record<string, CreateRecordingEventDto>,
   ): Promise<Record<string, RecordingEvent>> {
     const recording = await this.findOne(recordingId);
 
@@ -187,7 +190,7 @@ export class RecordingsService {
 
       recording.events = {
         ...recording.events,
-        ...eventsRecord,
+        ...events,
       };
 
       await this.recordingsRepository.save(recording);
@@ -203,7 +206,7 @@ export class RecordingsService {
         `Failed to add events to recording with ID ${recordingId}`,
         500,
         'ADD_EVENTS_FAILED',
-        { recordingId, eventCount: Object.keys(eventsRecord).length },
+        { recordingId, eventCount: Object.keys(events).length },
       );
     }
   }
