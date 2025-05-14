@@ -139,14 +139,16 @@ export class RecordingsController {
   async findAll(): Promise<Array<GetRecordingResponseDto>> {
     const recordings = await this.recordingsService.findAll();
 
-    return recordings.map(({ thumbnailPath, startTime, stopTime, duration, ...recording }) => ({
-      ...recording,
-      startTime: Number(startTime),
-      stopTime: stopTime !== null ? Number(stopTime) : null,
-      duration: Number(duration),
-      sourceUrl: `/recordings/${recording.id}/source`,
-      thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
-    }));
+    return recordings.map(
+      ({ thumbnailPath, startTime, stopTime, duration, ...recording }) => ({
+        ...recording,
+        startTime: Number(startTime),
+        stopTime: stopTime !== null ? Number(stopTime) : null,
+        duration: Number(duration),
+        sourceUrl: `/recordings/${recording.id}/source`,
+        thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
+      }),
+    );
   }
 
   @Get('/:id')
@@ -185,9 +187,9 @@ export class RecordingsController {
   @HttpCode(HttpStatus.CREATED)
   async addEvents(
     @Param('recordingId') recordingId: string,
-    @Body() eventsRecord: Record<string, CreateRecordingEventDto>,
+    @Body() { events }: { events: Record<string, CreateRecordingEventDto> },
   ): Promise<void> {
-    await this.recordingsService.addEvents(recordingId, eventsRecord);
+    await this.recordingsService.addEvents(recordingId, events);
   }
 
   @Get(':recordingId/events')
