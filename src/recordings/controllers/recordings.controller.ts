@@ -30,6 +30,7 @@ import { InvalidFileUploadException } from '../exceptions/invalid-file-upload.ex
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { StorageException } from '../../storage/exceptions/storage.exception';
 import { RecordingEvent } from '../entities/recording-events.types';
+import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -204,5 +205,26 @@ export class RecordingsController {
     }
 
     return recording.events || {};
+  }
+
+  @Delete(':recordingId/events/:eventId')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async deleteEvent(
+    @Param('recordingId') recordingId: string,
+    @Param('eventId') eventId: string,
+  ): Promise<void> {
+    const recording = await this.recordingsService.findOne(recordingId);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(recordingId);
+    }
+
+    const recordingEvent = await this.recordingsService.getEventById(recordingId, eventId);
+
+    if (!recordingEvent) {
+      throw new RecordingEventNotFoundException(eventId);
+    }
+
+    await this.recordingsService.deleteEvent(recordingId, eventId);
   }
 }

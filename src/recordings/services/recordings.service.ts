@@ -13,6 +13,7 @@ import {
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { AppBaseException } from '../../common/exceptions/base.exception';
 import { RecordingEvent } from '../entities/recording-events.types';
+import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 
 @Injectable()
 export class RecordingsService {
@@ -207,6 +208,45 @@ export class RecordingsService {
         500,
         'ADD_EVENTS_FAILED',
         { recordingId, eventCount: Object.keys(events).length },
+      );
+    }
+  }
+
+  async getEventById(recordingId: string, eventId: string): Promise<RecordingEvent | null> {
+    const recording = await this.findOne(recordingId);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(recordingId);
+    }
+
+    if (!recording.events || !recording.events[eventId]) {
+      return null;
+    }
+
+    return recording.events[eventId];
+  }
+
+  async deleteEvent(recordingId: string, eventId: string): Promise<void> {
+    const recording = await this.findOne(recordingId);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(recordingId);
+    }
+
+    if (!recording.events || !recording.events[eventId]) {
+      throw new RecordingEventNotFoundException(eventId);
+    }
+
+    try {
+      delete recording.events[eventId];
+      
+      await this.recordingsRepository.save(recording);
+    } catch (error) {
+      throw new AppBaseException(
+        `Failed to delete event with ID ${eventId} from recording with ID ${recordingId}`,
+        500,
+        'DELETE_EVENT_FAILED',
+        { recordingId, eventId },
       );
     }
   }
