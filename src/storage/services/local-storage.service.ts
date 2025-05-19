@@ -146,23 +146,19 @@ export class LocalStorageService implements StorageProvider {
       }
       
       const duration = await this.getVideoDuration(videoPath);
-      const timestampInSeconds = timestamp / 1000;
       
-      this.logger.debug(`Event ${eventId} - Original timestamp: ${timestamp}ms, In seconds: ${timestampInSeconds}s, Video duration: ${duration}s`);
+      let safeTimestamp = timestamp;
       
-      let safeTimestamp = timestampInSeconds;
-      
-      if (timestampInSeconds <= 0) {
-        this.logger.warn(`Timestamp for event ${eventId} is zero or negative: ${timestampInSeconds}. Using 1 second.`);
+      if (timestamp <= 0) {
+        this.logger.warn(`Timestamp for event ${eventId} is zero or negative: ${timestamp}. Using 1 second.`);
         
         safeTimestamp = 1;
-      } else if (timestampInSeconds >= duration) {
-        this.logger.warn(`Timestamp for event ${eventId} exceeds video duration: ${timestampInSeconds}s > ${duration}s. Using 95% of duration.`);
+      } else if (timestamp >= duration) {
+        this.logger.warn(`Timestamp for event ${eventId} exceeds video duration: ${timestamp}s > ${duration}s. Using 95% of duration.`);
         
         safeTimestamp = Math.max(duration * 0.95, 1);
       }
       
-     
       const timestampStr = safeTimestamp.toFixed(3);
       
       this.logger.log(`Generating screenshot for event ${eventId} at timestamp: ${timestampStr}s`);

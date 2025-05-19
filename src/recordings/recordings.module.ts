@@ -4,6 +4,9 @@ import { Recording } from './entities/recording.entity';
 import { RecordingsService } from './services/recordings.service';
 import { RecordingsController } from './controllers/recordings.controller';
 import { StorageModule } from '../storage/storage.module';
+import { RecordingCoreService } from './services/recording-core.service';
+import { RecordingEventService } from './services/recording-event.service';
+import { ScreenshotService } from './services/screenshot.service';
 
 @Module({
   imports: [
@@ -11,7 +14,12 @@ import { StorageModule } from '../storage/storage.module';
     StorageModule
   ],
   controllers: [RecordingsController],
-  providers: [RecordingsService],
+  providers: [
+    RecordingsService,
+    RecordingCoreService,
+    RecordingEventService,
+    ScreenshotService
+  ],
   exports: [RecordingsService],
 })
 export class RecordingsModule {}
