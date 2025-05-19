@@ -1,4 +1,5 @@
 import { IsUUID } from 'class-validator';
+import { RecordingEvent } from '../entities/recording-events.types';
 
 export class GetRecordingRequestDto {
   @IsUUID()
@@ -16,4 +17,5 @@ export class GetRecordingResponseDto {
   startTime: number;
   stopTime: number | null;
   duration: number;
+  events: Record<string, RecordingEvent>
 }

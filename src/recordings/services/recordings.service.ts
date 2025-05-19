@@ -1,257 +1,95 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 import { Recording } from '../entities/recording.entity';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { CreateRecordingDto } from '../dto/create-recording.dto';
-import {
-  STORAGE_PROVIDER,
-  StorageProvider,
-} from '../../storage/interfaces/storage-provider.interface';
-import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
-import { AppBaseException } from '../../common/exceptions/base.exception';
 import { RecordingEvent } from '../entities/recording-events.types';
-import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
+import { RecordingCoreService } from './recording-core.service';
+import { RecordingEventService } from './recording-event.service';
+import { ScreenshotService } from './screenshot.service';
 
 @Injectable()
 export class RecordingsService {
-  private readonly logger = new Logger(RecordingsService.name);
-
   constructor(
-    @InjectRepository(Recording)
-    private readonly recordingsRepository: Repository<Recording>,
-    @Inject(STORAGE_PROVIDER)
-    private readonly storageProvider: StorageProvider,
+    private readonly recordingCoreService: RecordingCoreService,
+    private readonly recordingEventService: RecordingEventService,
+    private readonly screenshotService: ScreenshotService,
   ) {}
 
   async create(
     createRecordingDto: CreateRecordingDto,
     file: Express.Multer.File,
   ): Promise<void> {
-    const { id, data } = createRecordingDto;
-
-    try {
-      const parsedData = JSON.parse(data);
-      const startTime = Number(parsedData.startTime);
-      const stopTime = parsedData.stopTime ? Number(parsedData.stopTime) : null;
-      const duration = stopTime ? Number(stopTime - startTime) : 0;
-
-      const recordingPartial: Partial<Recording> = {
-        id,
-        duration,
-        startTime,
-        stopTime,
-        name: file.originalname,
-        s3Key: id,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        events: {},
-      };
-
-      const recording = this.recordingsRepository.create(recordingPartial);
-
-      await this.storageProvider.saveFile(file, recording.id);
-
-      const videoPath = this.storageProvider.getFilePath(recording.s3Key);
-
-      try {
-        const thumbnailPath = await this.storageProvider.generateThumbnail(
-          videoPath,
-          recording.id,
-        );
-
-        recording.thumbnailPath = path.relative(process.cwd(), thumbnailPath);
-      } catch (thumbnailError) {
-        this.logger.warn(
-          `Failed to generate thumbnail for recording ${id}: ${thumbnailError.message}`,
-          thumbnailError.stack,
-        );
-
-        recording.thumbnailPath = null;
-      }
-
-      await this.recordingsRepository.save(recording);
-    } catch (error) {
-      this.logger.error(`Failed to create a recording: ${error.message}`, error.stack);
-
-      if (error instanceof AppBaseException) {
-        throw error;
-      }
-
-      if (error instanceof SyntaxError) {
-        throw new AppBaseException(
-          `Invalid recording data format: ${error.message}`,
-          400,
-          'INVALID_DATA_FORMAT',
-        );
-      }
-
-      throw new AppBaseException(
-        'Failed to create recording',
-        500,
-        'RECORDING_CREATE_FAILED',
-        { originalError: error.message },
-      );
-    }
+    await this.recordingCoreService.create(createRecordingDto, file);
   }
 
   async findAll(): Promise<Array<Recording>> {
-    try {
-      return this.recordingsRepository.find();
-    } catch (error) {
-      this.logger.error(`Failed to fetch recordings: ${error.message}`, error.stack);
-      throw new AppBaseException(
-        'Failed to fetch recordings',
-        500,
-        'FETCH_RECORDINGS_FAILED',
-      );
-    }
+    return this.recordingCoreService.findAll();
   }
 
   async findOne(id: string): Promise<Recording | null> {
-    try {
-      const recording = await this.recordingsRepository.findOne({
-        where: { id },
-      });
-
-      return recording;
-    } catch (error) {
-      this.logger.error(`Failed to find recording ${id}: ${error.message}`, error.stack);
-
-      throw new AppBaseException(
-        `Failed to fetch recording with ID ${id}`,
-        500,
-        'FETCH_RECORDING_FAILED',
-        { recordingId: id },
-      );
-    }
+    return this.recordingCoreService.findOne(id);
   }
 
   async getSignedUrl(id: string): Promise<string> {
-    const recording = await this.findOne(id);
-
-    if (!recording) {
-      throw new RecordingNotFoundException(id);
-    }
-
-    return this.storageProvider.getFilePath(recording.s3Key);
+    return this.recordingCoreService.getSignedUrl(id);
   }
 
   async remove(id: string): Promise<void> {
-    const recording = await this.findOne(id);
+    await this.recordingEventService.deleteAllEventsByRecordingId(id);
+    await this.screenshotService.deleteScreenshotsByRecordingId(id);
 
-    if (!recording) {
-      throw new RecordingNotFoundException(id);
-    }
-
-    const filePath = this.getFilePath(recording.s3Key);
-    const isRecordingSourceExists = fs.existsSync(filePath);
-
-    try {
-      if (isRecordingSourceExists) {
-        await this.storageProvider.deleteFile(recording.s3Key);
-      }
-
-      await this.recordingsRepository.remove(recording);
-    } catch (error) {
-      this.logger.error(
-        `Failed to delete recording ${id}: ${error.message}`,
-        error.stack,
-      );
-
-      if (error instanceof AppBaseException) {
-        throw error;
-      }
-
-      throw new AppBaseException(
-        `Failed to delete recording with ID ${id}`,
-        500,
-        'DELETE_RECORDING_FAILED',
-        { recordingId: id },
-      );
-    }
+    return this.recordingCoreService.remove(id);
   }
 
   async addEvents(
     recordingId: string,
     events: Record<string, CreateRecordingEventDto>,
   ): Promise<Record<string, RecordingEvent>> {
-    const recording = await this.findOne(recordingId);
-
-    if (!recording) {
-      throw new RecordingNotFoundException(recordingId);
-    }
-
-    try {
-      if (!recording.events) {
-        recording.events = {};
-      }
-
-      recording.events = {
-        ...recording.events,
-        ...events,
-      };
-
-      await this.recordingsRepository.save(recording);
-
-      return recording.events;
-    } catch (error) {
-      this.logger.error(
-        `Failed to add events to recording ${recordingId}: ${error.message}`,
-        error.stack,
-      );
-
-      throw new AppBaseException(
-        `Failed to add events to recording with ID ${recordingId}`,
-        500,
-        'ADD_EVENTS_FAILED',
-        { recordingId, eventCount: Object.keys(events).length },
-      );
-    }
+    return this.recordingEventService.addEvents(recordingId, events);
   }
 
-  async getEventById(recordingId: string, eventId: string): Promise<RecordingEvent | null> {
-    const recording = await this.findOne(recordingId);
+  formatEventsForResponse(
+    events: Record<string, RecordingEvent>,
+    recordingId: string,
+  ): Record<string, RecordingEvent> {
+    return this.recordingEventService.formatEventsForResponse(events, recordingId);
+  }
 
-    if (!recording) {
-      throw new RecordingNotFoundException(recordingId);
-    }
-
-    if (!recording.events || !recording.events[eventId]) {
-      return null;
-    }
-
-    return recording.events[eventId];
+  async getEventById(
+    recordingId: string,
+    eventId: string,
+  ): Promise<RecordingEvent | null> {
+    return this.recordingEventService.getEventById(recordingId, eventId);
   }
 
   async deleteEvent(recordingId: string, eventId: string): Promise<void> {
-    const recording = await this.findOne(recordingId);
+    return this.recordingEventService.deleteEvent(recordingId, eventId);
+  }
 
-    if (!recording) {
-      throw new RecordingNotFoundException(recordingId);
-    }
-
-    if (!recording.events || !recording.events[eventId]) {
-      throw new RecordingEventNotFoundException(eventId);
-    }
-
-    try {
-      delete recording.events[eventId];
-      
-      await this.recordingsRepository.save(recording);
-    } catch (error) {
-      throw new AppBaseException(
-        `Failed to delete event with ID ${eventId} from recording with ID ${recordingId}`,
-        500,
-        'DELETE_EVENT_FAILED',
-        { recordingId, eventId },
-      );
-    }
+  async addEventScreenshot(
+    recordingId: string,
+    eventId: string,
+    file: Express.Multer.File,
+  ): Promise<RecordingEvent> {
+    return this.recordingEventService.addEventScreenshot(recordingId, eventId, file);
   }
 
   getFilePath(key: string): string {
-    return this.storageProvider.getFilePath(key);
+    return this.recordingCoreService.getFilePath(key);
+  }
+
+  getEventScreenshotPath(recordingId: string, eventId: string): string | null {
+    return this.screenshotService.getEventScreenshotPath(recordingId, eventId);
+  }
+
+  async regenerateEventScreenshot(
+    recordingId: string,
+    eventId: string,
+  ): Promise<RecordingEvent> {
+    return this.recordingEventService.regenerateEventScreenshot(recordingId, eventId);
+  }
+
+  async generateRecordingEventsScreenshots(recordingId: string): Promise<void> {
+    return this.recordingEventService.generateRecordingEventsScreenshots(recordingId);
   }
 }
