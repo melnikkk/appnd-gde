@@ -48,7 +48,7 @@ export class ScreenshotService {
         fs.mkdirSync(screenshotsDir, { recursive: true });
       }
 
-      const filename = `${eventId}-${Date.now()}.jpg`;
+      const filename = `${eventId}.jpg`;
       const screenshotPath = path.join(screenshotsDir, filename);
 
       fs.writeFileSync(screenshotPath, file.buffer);
@@ -59,6 +59,7 @@ export class ScreenshotService {
         `Failed to save screenshot for event ${eventId}: ${error.message}`,
         error.stack,
       );
+
       throw new AppBaseException(
         `Failed to save screenshot for event ${eventId}`,
         500,
@@ -81,6 +82,7 @@ export class ScreenshotService {
 
       if (files.length > 0) {
         const mostRecentFile = files.sort().pop();
+
         if (mostRecentFile) {
           const filePath = path.join(screenshotsDir, mostRecentFile);
 
