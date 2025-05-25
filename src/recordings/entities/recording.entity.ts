@@ -1,6 +1,11 @@
 import { Entity, PrimaryColumn, Column } from 'typeorm';
 import { RecordingEventsRecord } from './recording-events.types';
 
+interface ViewData {
+  width: number;
+  height: number;
+}
+
 @Entity()
 export class Recording {
   @PrimaryColumn('uuid')
@@ -35,4 +40,7 @@ export class Recording {
 
   @Column('jsonb', { nullable: true, default: {} })
   events: RecordingEventsRecord;
+  
+  @Column('jsonb', { nullable: true })
+  viewData: ViewData;
 }

@@ -33,12 +33,14 @@ export class RecordingCoreService {
       const startTime = Number(parsedData.startTime);
       const stopTime = parsedData.stopTime ? Number(parsedData.stopTime) : null;
       const duration = stopTime ? Number(stopTime - startTime) : 0;
+      const viewData = parsedData.viewData
 
       const recordingPartial: Partial<Recording> = {
         id,
         duration,
         startTime,
         stopTime,
+        viewData,
         name: file.originalname,
         s3Key: id,
         mimeType: file.mimetype,
