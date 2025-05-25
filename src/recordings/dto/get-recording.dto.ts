@@ -17,5 +17,9 @@ export class GetRecordingResponseDto {
   startTime: number;
   stopTime: number | null;
   duration: number;
+  viewData: {
+    width: number;
+    height: number;
+  };
   events: Record<string, RecordingEvent>
 }
