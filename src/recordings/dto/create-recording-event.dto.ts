@@ -18,8 +18,4 @@ export class CreateRecordingEventDto {
   @IsNumber()
   @IsNotEmpty()
   timestamp: number;
-  
-  @IsNumber()
-  @IsNotEmpty()
-  index: number;
 }
