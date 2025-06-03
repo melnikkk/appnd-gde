@@ -15,6 +15,7 @@ import {
   HttpCode,
   HttpStatus,
   StreamableFile,
+  Patch,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RecordingsService } from '../services/recordings.service';
@@ -32,6 +33,7 @@ import { StorageException } from '../../storage/exceptions/storage.exception';
 import { RecordingEvent } from '../entities/recording-events.types';
 import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 import { AppBaseException } from 'src/common/exceptions/base.exception';
+import { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -289,7 +291,10 @@ export class RecordingsController {
         throw new RecordingEventNotFoundException(eventId);
       }
 
-      const screenshotPath = this.recordingsService.getEventScreenshotPath(recordingId, eventId);
+      const screenshotPath = this.recordingsService.getEventScreenshotPath(
+        recordingId,
+        eventId,
+      );
 
       if (!screenshotPath) {
         throw StorageException.fileNotFound(`Screenshot for event ${eventId}`);
@@ -333,7 +338,6 @@ export class RecordingsController {
   ): Promise<RecordingEvent> {
     try {
       return await this.recordingsService.regenerateEventScreenshot(recordingId, eventId);
-
     } catch (error) {
       if (
         error instanceof RecordingNotFoundException ||
@@ -373,6 +377,37 @@ export class RecordingsController {
         500,
         'GENERATE_SCREENSHOTS_FAILED',
         { recordingId },
+      );
+    }
+  }
+
+  @Patch(':recordingId/events/:eventId')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @HttpCode(HttpStatus.OK)
+  async updateEvent(
+    @Param('recordingId') recordingId: string,
+    @Param('eventId') eventId: string,
+    @Body() updateEventDto: UpdateRecordingEventDto,
+  ): Promise<RecordingEvent> {
+    try {
+      return await this.recordingsService.updateEvent(
+        recordingId,
+        eventId,
+        updateEventDto,
+      );
+    } catch (error) {
+      if (
+        error instanceof RecordingNotFoundException ||
+        error instanceof RecordingEventNotFoundException
+      ) {
+        throw error;
+      }
+
+      throw new AppBaseException(
+        `Failed to update event ${eventId}`,
+        500,
+        'UPDATE_EVENT_FAILED',
+        { recordingId, eventId },
       );
     }
   }

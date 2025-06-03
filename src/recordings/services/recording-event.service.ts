@@ -202,6 +202,79 @@ export class RecordingEventService {
     }
   }
 
+  async updateEvent(
+    recordingId: string,
+    eventId: string,
+    updateEventDto: Partial<RecordingEvent>,
+  ): Promise<RecordingEvent> {
+    const recording = await this.recordingCoreService.findOne(recordingId);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(recordingId);
+    }
+
+    if (!recording.events || !recording.events[eventId]) {
+      throw new RecordingEventNotFoundException(eventId);
+    }
+
+    try {
+      const currentEvent = recording.events[eventId];
+
+      if (
+        updateEventDto.timestamp !== undefined &&
+        updateEventDto.timestamp !== currentEvent.timestamp
+      ) {
+        const videoPath = this.recordingCoreService.getFilePath(recording.s3Key);
+        const relativeTimestamp =
+          Math.max(0, updateEventDto.timestamp - recording.startTime) / 1000;
+
+        try {
+          await this.screenshotService.generateScreenshotAtTimestamp(
+            videoPath,
+            eventId,
+            relativeTimestamp,
+          );
+
+          this.logger.log(
+            `Regenerated screenshot for event ${eventId} at updated timestamp ${updateEventDto.timestamp}`,
+          );
+        } catch (screenshotError) {
+          this.logger.warn(
+            `Failed to regenerate screenshot for event ${eventId}: ${screenshotError.message}`,
+            screenshotError.stack,
+          );
+        }
+      }
+
+      recording.events[eventId] = {
+        ...currentEvent,
+        ...updateEventDto,
+        id: eventId,
+        screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
+      };
+
+      await this.recordingCoreService.save(recording);
+
+      this.logger.log(
+        `Successfully updated event ${eventId} in recording ${recordingId}`,
+      );
+
+      return recording.events[eventId];
+    } catch (error) {
+      this.logger.error(
+        `Failed to update event ${eventId} in recording ${recordingId}: ${error.message}`,
+        error.stack,
+      );
+
+      throw new AppBaseException(
+        `Failed to update event with ID ${eventId} in recording with ID ${recordingId}`,
+        500,
+        'UPDATE_EVENT_FAILED',
+        { recordingId, eventId },
+      );
+    }
+  }
+
   async addEventScreenshot(
     recordingId: string,
     eventId: string,
