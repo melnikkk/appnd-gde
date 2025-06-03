@@ -63,7 +63,15 @@ export class RecordingsService {
   }
 
   async deleteEvent(recordingId: string, eventId: string): Promise<void> {
-    return this.recordingEventService.deleteEvent(recordingId, eventId);
+    await this.recordingEventService.deleteEvent(recordingId, eventId);
+  }
+
+  async updateEvent(
+    recordingId: string,
+    eventId: string,
+    updateEventDto: Partial<RecordingEvent>,
+  ): Promise<RecordingEvent> {
+    return this.recordingEventService.updateEvent(recordingId, eventId, updateEventDto);
   }
 
   async addEventScreenshot(
