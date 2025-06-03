@@ -108,12 +108,7 @@ export class RecordingEventService {
           continue;
         }
 
-        if (
-          !event.id ||
-          !event.type ||
-          event.timestamp === undefined ||
-          event.index === undefined
-        ) {
+        if (!event.id || !event.type || event.timestamp === undefined) {
           this.logger.warn(
             `Event ${eventId} is missing required properties: ${JSON.stringify(event)}`,
           );
@@ -121,9 +116,8 @@ export class RecordingEventService {
           result[eventId] = {
             id: event.id || eventId,
             data: event.data || {},
-            timestamp: typeof event.timestamp === 'number' ? event.timestamp : 0,
+            timestamp: event.timestamp,
             type: event.type || 'unknown',
-            index: typeof event.index === 'number' ? event.index : 0,
             screenshotUrl:
               event.screenshotUrl ??
               `/recordings/${recordingId}/events/${eventId}/screenshot`,
@@ -137,7 +131,6 @@ export class RecordingEventService {
           data: event.data,
           timestamp: event.timestamp,
           type: event.type,
-          index: event.index,
           screenshotUrl:
             event.screenshotUrl ??
             `/recordings/${recordingId}/events/${eventId}/screenshot`,
@@ -187,14 +180,16 @@ export class RecordingEventService {
       delete recording.events[eventId];
 
       await this.recordingCoreService.save(recording);
-      
-      this.logger.log(`Successfully deleted event ${eventId} from recording ${recordingId}`);
+
+      this.logger.log(
+        `Successfully deleted event ${eventId} from recording ${recordingId}`,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to delete event ${eventId} from recording ${recordingId}: ${error.message}`,
-        error.stack
+        error.stack,
       );
-      
+
       throw new AppBaseException(
         `Failed to delete event with ID ${eventId} from recording with ID ${recordingId}`,
         500,
@@ -232,7 +227,6 @@ export class RecordingEventService {
         data: recording.events[eventId].data,
         timestamp: recording.events[eventId].timestamp,
         type: recording.events[eventId].type,
-        index: recording.events[eventId].index,
         screenshotUrl: recording.events[eventId].screenshotUrl,
       };
     } catch (error) {
@@ -295,7 +289,6 @@ export class RecordingEventService {
         data: recordingEvent.data,
         timestamp: recordingEvent.timestamp,
         type: recordingEvent.type,
-        index: recordingEvent.index,
         screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
       };
     } catch (error) {
@@ -375,32 +368,32 @@ export class RecordingEventService {
   async deleteAllEventsByRecordingId(recordingId: string): Promise<void> {
     try {
       const recording = await this.recordingCoreService.findOne(recordingId);
-      
+
       if (!recording || !recording.events) {
         return;
       }
-      
+
       const eventIds = Object.keys(recording.events);
-      
+
       if (eventIds.length === 0) {
         return;
       }
-      
+
       this.logger.log(`Deleting ${eventIds.length} events for recording ${recordingId}`);
-      
+
       for (const eventId of eventIds) {
         await this.screenshotService.deleteScreenshotByEventId(eventId);
       }
-      
+
       recording.events = {};
-      
+
       await this.recordingCoreService.save(recording);
-      
+
       this.logger.log(`Successfully deleted all events for recording ${recordingId}`);
     } catch (error) {
       this.logger.error(
         `Failed to delete events for recording ${recordingId}: ${error.message}`,
-        error.stack
+        error.stack,
       );
     }
   }
