@@ -62,6 +62,10 @@ export class RecordingsService {
     return this.recordingEventService.getEventById(recordingId, eventId);
   }
 
+  async getAllEvents(recordingId: string): Promise<Record<string, RecordingEvent>> {
+    return this.recordingEventService.getAllEventsByRecordingId(recordingId);
+  }
+
   async deleteEvent(recordingId: string, eventId: string): Promise<void> {
     return this.recordingEventService.deleteEvent(recordingId, eventId);
   }

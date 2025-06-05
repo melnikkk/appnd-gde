@@ -1,6 +1,9 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { RecordingCoreService } from './recording-core.service';
-import { RecordingEvent } from '../entities/recording-events.types';
+import {
+  RecordingEvent,
+  RecordingEventsRecord,
+} from '../entities/recording-events.types';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
@@ -394,6 +397,34 @@ export class RecordingEventService {
       this.logger.error(
         `Failed to delete events for recording ${recordingId}: ${error.message}`,
         error.stack,
+      );
+    }
+  }
+
+  async getAllEventsByRecordingId(recordingId: string): Promise<RecordingEventsRecord> {
+    try {
+      const recording = await this.recordingCoreService.findOne(recordingId);
+
+      if (!recording) {
+        throw new RecordingNotFoundException(recordingId);
+      }
+
+      if (!recording.events || Object.keys(recording.events).length === 0) {
+        return {};
+      }
+
+      return this.formatEventsForResponse(recording.events, recordingId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get events for recording ${recordingId}: ${error.message}`,
+        error.stack,
+      );
+
+      throw new AppBaseException(
+        `Failed to get events for recording ${recordingId}`,
+        500,
+        'GET_EVENTS_FAILED',
+        { recordingId, error: error.message },
       );
     }
   }
