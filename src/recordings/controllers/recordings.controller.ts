@@ -205,9 +205,7 @@ export class RecordingsController {
       throw new RecordingNotFoundException(recordingId);
     }
 
-    const events = recording.events || {};
-
-    return this.recordingsService.formatEventsForResponse(events, recordingId);
+    return await this.recordingsService.getAllEvents(recordingId);
   }
 
   @Delete(':recordingId/events/:eventId')
