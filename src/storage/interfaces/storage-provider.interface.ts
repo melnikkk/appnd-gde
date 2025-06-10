@@ -12,4 +12,6 @@ export interface StorageProvider {
   getThumbnailPath(key: string): string;
 
   deleteFile(key: string): Promise<void>;
+  
+  downloadFile(url: string, destPath: string): Promise<void>;
 }

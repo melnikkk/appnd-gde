@@ -8,17 +8,30 @@ export class PathManagerService implements PathManager {
   private readonly uploadDir: string;
   private readonly thumbnailDir: string;
   private readonly screenshotsDir: string;
+  private readonly guidesDir: string;
+  private readonly guideScreenshotsDir: string;
+  private readonly guideAnnotatedScreenshotsDir: string;
 
   constructor() {
     this.uploadDir = path.join(process.cwd(), 'uploads', 'recordings');
     this.thumbnailDir = path.join(process.cwd(), 'uploads', 'thumbnails');
     this.screenshotsDir = path.join(process.cwd(), 'uploads', 'event-screenshots');
+    this.guidesDir = path.join(process.cwd(), 'uploads', 'guides');
+    this.guideScreenshotsDir = path.join(this.guidesDir, 'screenshots');
+    this.guideAnnotatedScreenshotsDir = path.join(this.guidesDir, 'annotated-screenshots');
 
     this.ensureDirectoriesExist();
   }
 
   private ensureDirectoriesExist(): void {
-    for (const dir of [this.uploadDir, this.thumbnailDir, this.screenshotsDir]) {
+    for (const dir of [
+      this.uploadDir, 
+      this.thumbnailDir, 
+      this.screenshotsDir,
+      this.guidesDir,
+      this.guideScreenshotsDir,
+      this.guideAnnotatedScreenshotsDir
+    ]) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
@@ -39,6 +52,18 @@ export class PathManagerService implements PathManager {
 
   getScreenshotsDir(): string {
     return this.screenshotsDir;
+  }
+
+  getGuidesDir(): string {
+    return this.guidesDir;
+  }
+
+  getGuideScreenshotsDir(): string {
+    return this.guideScreenshotsDir;
+  }
+
+  getGuideAnnotatedScreenshotsDir(): string {
+    return this.guideAnnotatedScreenshotsDir;
   }
 
   getFilePath(key: string): string {
