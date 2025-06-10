@@ -1,8 +1,11 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
+import * as http from 'http';
+import * as https from 'https';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { pipeline } from 'stream/promises';
 import { StorageProvider } from '../interfaces/storage-provider.interface';
 import { StorageException } from '../exceptions/storage.exception';
 import { PathManagerService } from './path-manager.service';
@@ -96,6 +99,51 @@ export class LocalStorageService implements StorageProvider {
   ): Promise<void> {
     if (fs.existsSync(filePath)) {
       await action(filePath);
+    }
+  }
+
+  async downloadFile(url: string, destPath: string): Promise<void> {
+    try {
+      this.logger.log(`Downloading file from ${url} to ${destPath}`);
+      
+      if (url.startsWith('/') || url.startsWith('file://')) {
+        const sourcePath = url.startsWith('/') ? url : url.slice(7);
+        
+        await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+        await fs.promises.copyFile(sourcePath, destPath);
+        return;
+      }
+      
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        const client = url.startsWith('https://') ? https : http;
+        
+        await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+        
+        const fileStream = fs.createWriteStream(destPath);
+
+        await new Promise<void>((resolve, reject) => {
+          const request = client.get(url, (response) => {
+            if (response.statusCode !== 200) {
+              reject(new Error(`Failed to download: ${response.statusCode} ${response.statusMessage}`));
+              
+              return;
+            }
+            
+            pipeline(response, fileStream)
+              .then(() => resolve())
+              .catch(reject);
+          });
+          
+          request.on('error', reject);
+        });
+        
+        return;
+      }
+      
+      throw new Error(`Unsupported URL protocol: ${url}`);
+    } catch (error) {
+      this.logger.error(`Failed to download file: ${error.message}`, error.stack);
+      throw StorageException.failedToSave(error);
     }
   }
 }
