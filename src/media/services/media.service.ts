@@ -124,7 +124,7 @@ export class MediaService implements MediaProcessor {
   }
 
   async getVideoDuration(videoPath: string): Promise<number> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       ffmpeg.ffprobe(videoPath, (err, metadata) => {
         if (err) {
           this.logger.warn(`Could not probe video duration: ${err.message}`);

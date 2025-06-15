@@ -6,6 +6,7 @@ import { RecordingEvent } from '../entities/recording-events.types';
 import { RecordingCoreService } from './recording-core.service';
 import { RecordingEventService } from './recording-event.service';
 import { ScreenshotService } from './screenshot.service';
+import { GuideGeneratorService } from '../../guides/services/guide-generator.service';
 
 @Injectable()
 export class RecordingsService {
@@ -13,6 +14,7 @@ export class RecordingsService {
     private readonly recordingCoreService: RecordingCoreService,
     private readonly recordingEventService: RecordingEventService,
     private readonly screenshotService: ScreenshotService,
+    private readonly guideGeneratorService: GuideGeneratorService,
   ) {}
 
   async create(
@@ -103,5 +105,15 @@ export class RecordingsService {
 
   async generateRecordingEventsScreenshots(recordingId: string): Promise<void> {
     return this.recordingEventService.generateRecordingEventsScreenshots(recordingId);
+  }
+
+  async exportRecordingAsStepGuide(recordingId: string): Promise<string | null> {
+    const recording = await this.findOne(recordingId);
+
+    if (!recording) {
+      return null;
+    }
+
+    return this.guideGeneratorService.generateStepByStepGuide(recording, recording.events);
   }
 }

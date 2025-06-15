@@ -6,6 +6,8 @@ import { RecordingsModule } from './recordings/recordings.module';
 import { DatabaseModule } from './database/database.module';
 import { StorageModule } from './storage/storage.module';
 import { MediaModule } from './media/media.module';
+import { TemplatesModule } from './templates/templates.module';
+import { GuidesModule } from './guides/guides.module';
 import { MAX_UPLOADED_FILE_SIZE } from './recordings/recordings.constants';
 
 @Module({
@@ -14,6 +16,8 @@ import { MAX_UPLOADED_FILE_SIZE } from './recordings/recordings.constants';
     DatabaseModule,
     StorageModule,
     MediaModule,
+    TemplatesModule,
+    GuidesModule,
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',
