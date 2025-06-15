@@ -411,4 +411,30 @@ export class RecordingsController {
       );
     }
   }
+
+  
+  @Get(':id/guide')
+  @Header('Content-Type', 'text/html')
+  async exportRecordingAsStepGuide(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<string> {
+    const recording = await this.recordingsService.findOne(id);
+    
+    if (!recording) {
+      throw new RecordingNotFoundException(id);
+    }
+    
+    const htmlContent = await this.recordingsService.exportRecordingAsStepGuide(id);
+
+    if (!htmlContent) {
+      throw new AppBaseException(
+        'Failed to generate step guide',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'STEP_GUIDE_GENERATION_FAILED'
+      );
+    }
+    
+    return htmlContent;
+  }
 }

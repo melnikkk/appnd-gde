@@ -7,11 +7,13 @@ import { StorageModule } from '../storage/storage.module';
 import { RecordingCoreService } from './services/recording-core.service';
 import { RecordingEventService } from './services/recording-event.service';
 import { ScreenshotService } from './services/screenshot.service';
+import { GuidesModule } from '../guides/guides.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Recording]),
-    StorageModule
+    StorageModule,
+    GuidesModule
   ],
   controllers: [RecordingsController],
   providers: [
