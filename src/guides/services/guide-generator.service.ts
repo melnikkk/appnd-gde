@@ -10,8 +10,9 @@ import { RecordingEventType } from '../../recordings/entities/recording-event.co
 interface GuideStep {
   title: string;
   description?: string;
-  imageUrl?: string;
+  imageUrl: string | null;
   timestamp: number;
+  events?: Array<RecordingEvent>;
 }
 
 @Injectable()
@@ -35,24 +36,31 @@ export class GuideGeneratorService {
   }
 
   private convertEventsToGuideSteps(events: RecordingEventsRecord): GuideStep[] {
-    const eventsArray: RecordingEvent[] = Object.values(events);
+    const eventsArray: Array<RecordingEvent> = Object.values(events);
     const sortedEvents = eventsArray.sort((a, b) => a.timestamp - b.timestamp);
+    const screenshotEvents = sortedEvents.filter((event) => event.screenshotUrl);
 
-    return (
-      sortedEvents
-        .filter((event) => event.screenshotUrl)
-        .map((event, index) => {
-          const step: GuideStep = {
-            title: this.generateStepTitle(event, index),
-            timestamp: event.timestamp,
-            imageUrl: event.screenshotUrl || undefined,
-          };
+    return screenshotEvents.map((mainEvent, index) => {
+      const nextScreenshotEvent = screenshotEvents[index + 1];
+      const nextTimestamp = nextScreenshotEvent ? nextScreenshotEvent.timestamp : Infinity;
+      
+      const relatedEvents = sortedEvents.filter(
+        (event) => 
+          event.timestamp >= mainEvent.timestamp && 
+          event.timestamp < nextTimestamp
+      );
 
-          step.description = this.generateStepDescription(event);
+      const step: GuideStep = {
+        title: this.generateStepTitle(mainEvent, index),
+        timestamp: mainEvent.timestamp,
+        imageUrl: mainEvent.screenshotUrl ?? null,
+        events: relatedEvents,
+      };
 
-          return step;
-        })
-    );
+      step.description = this.generateStepDescription(mainEvent);
+
+      return step;
+    });
   }
 
   private generateStepTitle(event: RecordingEvent, index: number): string {
@@ -68,9 +76,11 @@ export class GuideGeneratorService {
     switch (event.type) {
       case RecordingEventType.CLICK:
         const coordinates = event.data?.coordinates;
+        
         if (coordinates) {
           return `Click at position x: ${coordinates.x}, y: ${coordinates.y}`;
         }
+
         return undefined;
       default:
         return undefined;
