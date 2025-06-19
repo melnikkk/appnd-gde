@@ -7,6 +7,7 @@ import { RecordingCoreService } from './recording-core.service';
 import { RecordingEventService } from './recording-event.service';
 import { ScreenshotService } from './screenshot.service';
 import { GuideGeneratorService } from '../../guides/services/guide-generator.service';
+import { EmbedCodeService } from './embed-code.service';
 
 @Injectable()
 export class RecordingsService {
@@ -15,6 +16,7 @@ export class RecordingsService {
     private readonly recordingEventService: RecordingEventService,
     private readonly screenshotService: ScreenshotService,
     private readonly guideGeneratorService: GuideGeneratorService,
+    private readonly embedCodeService: EmbedCodeService,
   ) {}
 
   async create(
@@ -115,5 +117,24 @@ export class RecordingsService {
     }
 
     return this.guideGeneratorService.generateStepByStepGuide(recording, recording.events);
+  }
+
+  async generateEmbedCode(recordingId: string, width?: string, height?: string): Promise<string | null> {
+    const stepGuideContent = await this.exportRecordingAsStepGuide(recordingId);
+    
+    if (!stepGuideContent) {
+      return null;
+    }
+
+    const encodedStepGuide = Buffer.from(stepGuideContent).toString('base64');
+    const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+    return this.embedCodeService.generateEmbedCode({
+      recordingId,
+      width,
+      height,
+      serverUrl,
+      encodedContent: encodedStepGuide,
+    });
   }
 }

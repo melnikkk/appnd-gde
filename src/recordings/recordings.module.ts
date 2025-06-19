@@ -8,6 +8,7 @@ import { RecordingCoreService } from './services/recording-core.service';
 import { RecordingEventService } from './services/recording-event.service';
 import { ScreenshotService } from './services/screenshot.service';
 import { GuidesModule } from '../guides/guides.module';
+import { EmbedCodeService } from './services/embed-code.service';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { GuidesModule } from '../guides/guides.module';
     RecordingsService,
     RecordingCoreService,
     RecordingEventService,
-    ScreenshotService
+    ScreenshotService,
+    EmbedCodeService
   ],
   exports: [RecordingsService],
 })
