@@ -16,6 +16,7 @@ import {
   HttpStatus,
   StreamableFile,
   Patch,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RecordingsService } from '../services/recordings.service';
@@ -412,29 +413,57 @@ export class RecordingsController {
     }
   }
 
-  
   @Get(':id/guide')
-  @Header('Content-Type', 'text/html')
+  @Header('Content-Type', 'text/plain')
   async exportRecordingAsStepGuide(
     @Param('id') id: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<string> {
     const recording = await this.recordingsService.findOne(id);
-    
+
     if (!recording) {
       throw new RecordingNotFoundException(id);
     }
-    
+
     const htmlContent = await this.recordingsService.exportRecordingAsStepGuide(id);
 
     if (!htmlContent) {
       throw new AppBaseException(
         'Failed to generate step guide',
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'STEP_GUIDE_GENERATION_FAILED'
+        'STEP_GUIDE_GENERATION_FAILED',
       );
     }
-    
+
     return htmlContent;
+  }
+
+  @Get(':id/embed-code')
+  @Header('Content-Type', 'text/plain')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'")
+  async getEmbedCode(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) _res: Response,
+    @Query('width') width?: string,
+    @Query('height') height?: string,
+  ): Promise<string> {
+    const recording = await this.recordingsService.findOne(id);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(id);
+    }
+
+    const embedCode = await this.recordingsService.generateEmbedCode(id, width, height);
+
+    if (!embedCode) {
+      throw new AppBaseException(
+        'Failed to generate embed code',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'EMBED_CODE_GENERATION_FAILED',
+      );
+    }
+
+    return embedCode;
   }
 }
