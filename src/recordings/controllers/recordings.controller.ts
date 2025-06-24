@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { Response, Request } from 'express';
+import type { Response, Request } from 'express';
 import {
   Controller,
   Get,
@@ -19,22 +19,22 @@ import {
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { RecordingsService } from '../services/recordings.service';
+import type { RecordingsService } from '../services/recordings.service';
 import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from '../recordings.constants';
-import {
+import type {
   GetRecordingRequestDto,
   GetRecordingResponseDto,
 } from '../dto/get-recording.dto';
-import { DeleteRecordingDto } from '../dto/delete-recording.dto';
-import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
-import { CreateRecordingDto } from '../dto/create-recording.dto';
+import type { DeleteRecordingDto } from '../dto/delete-recording.dto';
+import type { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
+import type { CreateRecordingDto } from '../dto/create-recording.dto';
 import { InvalidFileUploadException } from '../exceptions/invalid-file-upload.exception';
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { StorageException } from '../../storage/exceptions/storage.exception';
-import { RecordingEvent } from '../entities/recording-events.types';
+import type { RecordingEvent } from '../entities/recording-events.types';
 import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 import { AppBaseException } from 'src/common/exceptions/base.exception';
-import { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
+import type { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -141,7 +141,7 @@ export class RecordingsController {
 
   @Get()
   @Header('X-Content-Type-Options', 'nosniff')
-  async findAll(): Promise<Array<GetRecordingResponseDto>> {
+  async findAll(): Promise<GetRecordingResponseDto[]> {
     const recordings = await this.recordingsService.findAll();
 
     return recordings.map(
@@ -352,7 +352,11 @@ export class RecordingsController {
         `Failed to regenerate screenshot for event ${eventId}`,
         500,
         'REGENERATE_SCREENSHOT_FAILED',
-        { recordingId, eventId, error: error.message },
+        {
+          recordingId,
+          eventId,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
       );
     }
   }
@@ -415,10 +419,7 @@ export class RecordingsController {
 
   @Get(':id/guide')
   @Header('Content-Type', 'text/plain')
-  async exportRecordingAsStepGuide(
-    @Param('id') id: string,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<string> {
+  async exportRecordingAsStepGuide(@Param('id') id: string): Promise<string> {
     const recording = await this.recordingsService.findOne(id);
 
     if (!recording) {
@@ -439,12 +440,11 @@ export class RecordingsController {
   }
 
   @Get(':id/embed-code')
-  @Header('Content-Type', 'text/plain')
+  @Header('Content-Type', 'text/javascript')
   @Header('X-Content-Type-Options', 'nosniff')
   @Header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'")
   async getEmbedCode(
     @Param('id') id: string,
-    @Res({ passthrough: true }) _res: Response,
     @Query('width') width?: string,
     @Query('height') height?: string,
   ): Promise<string> {
