@@ -1,7 +1,7 @@
-import { RecordingEventType } from './recording-event.constants';
+import type { RecordingEventType } from './recording-event.constants';
 
 export interface ClickRecordingEventData {
-  coordinates: {
+  coordinates?: {
     x: number;
     y: number;
   };
@@ -9,9 +9,7 @@ export interface ClickRecordingEventData {
 
 export type RecordingEventData = ClickRecordingEventData;
 
-export interface RecordingEventsRecord {
-  [recordingId: string]: RecordingEvent;
-}
+export type RecordingEventsRecord = Record<string, RecordingEvent>;
 
 export interface RecordingEvent {
   id: string;

@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import type { Response, Request } from 'express';
+import { Response, Request } from 'express';
 import {
   Controller,
   Get,
@@ -19,22 +19,22 @@ import {
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { RecordingsService } from '../services/recordings.service';
+import { RecordingsService } from '../services/recordings.service';
 import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from '../recordings.constants';
-import type {
+import {
   GetRecordingRequestDto,
   GetRecordingResponseDto,
 } from '../dto/get-recording.dto';
-import type { DeleteRecordingDto } from '../dto/delete-recording.dto';
-import type { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
-import type { CreateRecordingDto } from '../dto/create-recording.dto';
+import { DeleteRecordingDto } from '../dto/delete-recording.dto';
+import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
+import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { InvalidFileUploadException } from '../exceptions/invalid-file-upload.exception';
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { StorageException } from '../../storage/exceptions/storage.exception';
-import type { RecordingEvent } from '../entities/recording-events.types';
+import { RecordingEvent } from '../entities/recording-events.types';
 import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 import { AppBaseException } from 'src/common/exceptions/base.exception';
-import type { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
+import { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -49,7 +49,7 @@ export class RecordingsController {
       },
     }),
   )
-  async create(
+  create(
     @UploadedFile() file: Express.Multer.File,
     @Body() createRecordingDto: CreateRecordingDto,
   ): Promise<void> {
@@ -141,14 +141,14 @@ export class RecordingsController {
 
   @Get()
   @Header('X-Content-Type-Options', 'nosniff')
-  async findAll(): Promise<GetRecordingResponseDto[]> {
+  async findAll(): Promise<Array<GetRecordingResponseDto>> {
     const recordings = await this.recordingsService.findAll();
 
     return recordings.map(
       ({ thumbnailPath, startTime, stopTime, duration, ...recording }) => ({
         ...recording,
         startTime: Number(startTime),
-        stopTime: stopTime !== null ? Number(stopTime) : null,
+        stopTime: stopTime === null ? null : Number(stopTime),
         duration: Number(duration),
         sourceUrl: `/recordings/${recording.id}/source`,
         thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
@@ -172,7 +172,7 @@ export class RecordingsController {
     return {
       ...recordingData,
       startTime: Number(startTime),
-      stopTime: stopTime !== null ? Number(stopTime) : null,
+      stopTime: stopTime === null ? null : Number(stopTime),
       duration: Number(duration),
       sourceUrl: `/recordings/${recording.id}/source`,
       thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
@@ -301,11 +301,8 @@ export class RecordingsController {
         throw StorageException.fileNotFound(`Screenshot for event ${eventId}`);
       }
 
-      if (!fs.existsSync(screenshotPath)) {
-        throw StorageException.fileNotFound(screenshotPath);
-      }
-
       const file = fs.createReadStream(screenshotPath);
+      
       res.set({
         'Content-Type': 'image/jpeg',
         'Content-Disposition': `inline; filename="${eventId}.jpg"`,
@@ -418,25 +415,35 @@ export class RecordingsController {
   }
 
   @Get(':id/guide')
-  @Header('Content-Type', 'text/plain')
-  async exportRecordingAsStepGuide(@Param('id') id: string): Promise<string> {
+  @Header('Content-Type', 'text/javascript')
+  async exportRecordingAsStepGuide(
+    @Param('id') id: string,
+  ): Promise<string> {
     const recording = await this.recordingsService.findOne(id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
     }
 
-    const htmlContent = await this.recordingsService.exportRecordingAsStepGuide(id);
+    try {
+      const htmlContent = await this.recordingsService.exportRecordingAsStepGuide(id);
 
-    if (!htmlContent) {
+      if (!htmlContent) {
+        throw new AppBaseException(
+          'Failed to generate step guide',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'STEP_GUIDE_GENERATION_FAILED',
+        );
+      }
+
+      return htmlContent;
+    } catch (error) {
       throw new AppBaseException(
-        'Failed to generate step guide',
+        `Failed to generate step guide: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
         'STEP_GUIDE_GENERATION_FAILED',
       );
     }
-
-    return htmlContent;
   }
 
   @Get(':id/embed-code')

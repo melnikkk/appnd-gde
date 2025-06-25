@@ -1,12 +1,12 @@
+import { Request, Response } from 'express';
 import {
-  ArgumentsHost,
   Catch,
-  ExceptionFilter,
   HttpStatus,
   Logger,
+  ArgumentsHost,
+  ExceptionFilter,
 } from '@nestjs/common';
 import { ValidationError } from 'class-validator';
-import { Request, Response } from 'express';
 
 interface ValidationErrorResponse {
   statusCode: number;
@@ -29,7 +29,6 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    // Check if this is a validation exception
     if (
       exception?.response?.statusCode === HttpStatus.BAD_REQUEST &&
       Array.isArray(exception?.response?.message)
@@ -55,41 +54,41 @@ export class ValidationExceptionFilter implements ExceptionFilter {
 
       response.status(HttpStatus.BAD_REQUEST).json(errorResponse);
     } else {
-      // Pass to the next filter if it's not a validation error
       throw exception;
     }
   }
 
   private formatValidationErrors(
-    errors: ValidationError[] | string[],
-  ): Record<string, string[]> {
-    const result: Record<string, string[]> = {};
+    errors: Array<ValidationError> | Array<string>,
+  ): Record<string, Array<string>> {
+    const result: Record<string, Array<string>> = {};
 
     if (!errors?.length) {
       return result;
     }
 
-    // Handle simple string array error messages
     if (typeof errors[0] === 'string') {
-      result['_global'] = errors as string[];
+      result['_global'] = errors as Array<string>;
+
       return result;
     }
 
-    // Handle validation errors from class-validator
-    const validationErrors = errors as ValidationError[];
+    const validationErrors = errors as Array<ValidationError>;
+
     validationErrors.forEach((error) => {
       const property = error.property;
       const constraints = error.constraints ? Object.values(error.constraints) : [];
-      
+
       if (constraints.length) {
         result[property] = constraints;
       }
 
-      // Handle nested validation errors
       if (error.children?.length) {
         const nestedErrors = this.formatValidationErrors(error.children);
+
         Object.entries(nestedErrors).forEach(([nestedProp, messages]) => {
           const fullPath = `${property}.${nestedProp}`;
+          
           result[fullPath] = messages;
         });
       }

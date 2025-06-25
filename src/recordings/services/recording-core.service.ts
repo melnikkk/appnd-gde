@@ -97,7 +97,7 @@ export class RecordingCoreService {
 
   async findAll(): Promise<Array<Recording>> {
     try {
-      return this.recordingsRepository.find();
+      return await this.recordingsRepository.find();
     } catch (error) {
       this.logger.error(`Failed to fetch recordings: ${error.message}`, error.stack);
       throw new AppBaseException(
