@@ -1,11 +1,5 @@
-import {
-  ArgumentsHost,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
+import { Catch, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AppBaseException } from '../exceptions/base.exception';
 
@@ -34,7 +28,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     this.logger.error(
       `${request.method} ${request.url} - Status: ${status}, Message: ${message}`,
-      exception instanceof Error ? exception.stack : undefined,
+      exception.stack,
     );
 
     const errorResponse: ErrorResponse = {
@@ -90,7 +84,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof AppBaseException) {
       return exception.details;
     }
-    
+
     return undefined;
   }
 

@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import type { Response, Request } from 'express';
+import { Response, Request } from 'express';
 import {
   Controller,
   Get,
@@ -15,26 +15,25 @@ import {
   HttpCode,
   HttpStatus,
   StreamableFile,
-  Patch,
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { RecordingsService } from '../services/recordings.service';
-import { ALLOWED_MIME_TYPES, MAX_UPLOADED_FILE_SIZE } from '../recordings.constants';
-import type {
+import { RecordingsService } from '../services/recordings.service';
+import {
   GetRecordingRequestDto,
   GetRecordingResponseDto,
 } from '../dto/get-recording.dto';
-import type { DeleteRecordingDto } from '../dto/delete-recording.dto';
-import type { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
-import type { CreateRecordingDto } from '../dto/create-recording.dto';
+import { DeleteRecordingDto } from '../dto/delete-recording.dto';
+import { CreateRecordingDto } from '../dto/create-recording.dto';
 import { InvalidFileUploadException } from '../exceptions/invalid-file-upload.exception';
 import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 import { StorageException } from '../../storage/exceptions/storage.exception';
-import type { RecordingEvent } from '../entities/recording-events.types';
-import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 import { AppBaseException } from 'src/common/exceptions/base.exception';
-import type { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
+import {
+  ALLOWED_MIME_TYPES,
+  MAX_UPLOADED_FILE_SIZE,
+} from '../../common/constants/media.constants';
+import { Recording } from '../entities/recording.entity';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -52,7 +51,7 @@ export class RecordingsController {
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Body() createRecordingDto: CreateRecordingDto,
-  ): Promise<void> {
+  ): Promise<Recording> {
     if (!file) {
       throw InvalidFileUploadException.noFile();
     }
@@ -141,7 +140,7 @@ export class RecordingsController {
 
   @Get()
   @Header('X-Content-Type-Options', 'nosniff')
-  async findAll(): Promise<GetRecordingResponseDto[]> {
+  async findAll(): Promise<Array<GetRecordingResponseDto>> {
     const recordings = await this.recordingsService.findAll();
 
     return recordings.map(
@@ -184,237 +183,6 @@ export class RecordingsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param() { id }: DeleteRecordingDto): Promise<void> {
     await this.recordingsService.remove(id);
-  }
-
-  @Post(':recordingId/events')
-  @Header('X-Content-Type-Options', 'nosniff')
-  @Header('Content-Type', 'application/json')
-  @HttpCode(HttpStatus.CREATED)
-  async addEvents(
-    @Param('recordingId') recordingId: string,
-    @Body() { events }: { events: Record<string, CreateRecordingEventDto> },
-  ): Promise<Record<string, RecordingEvent>> {
-    return await this.recordingsService.addEvents(recordingId, events);
-  }
-
-  @Get(':recordingId/events')
-  @Header('X-Content-Type-Options', 'nosniff')
-  async getEvents(
-    @Param('recordingId') recordingId: string,
-  ): Promise<Record<string, RecordingEvent>> {
-    const recording = await this.recordingsService.findOne(recordingId);
-
-    if (!recording) {
-      throw new RecordingNotFoundException(recordingId);
-    }
-
-    return await this.recordingsService.getAllEvents(recordingId);
-  }
-
-  @Delete(':recordingId/events/:eventId')
-  @Header('X-Content-Type-Options', 'nosniff')
-  async deleteEvent(
-    @Param('recordingId') recordingId: string,
-    @Param('eventId') eventId: string,
-  ): Promise<void> {
-    const recording = await this.recordingsService.findOne(recordingId);
-
-    if (!recording) {
-      throw new RecordingNotFoundException(recordingId);
-    }
-
-    const recordingEvent = await this.recordingsService.getEventById(
-      recordingId,
-      eventId,
-    );
-
-    if (!recordingEvent) {
-      throw new RecordingEventNotFoundException(eventId);
-    }
-
-    await this.recordingsService.deleteEvent(recordingId, eventId);
-  }
-
-  @Post(':recordingId/events/:eventId/screenshot')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      limits: {
-        fileSize: MAX_UPLOADED_FILE_SIZE,
-        fieldSize: 1024 * 1024,
-      },
-    }),
-  )
-  @Header('X-Content-Type-Options', 'nosniff')
-  async uploadEventScreenshot(
-    @Param('recordingId') recordingId: string,
-    @Param('eventId') eventId: string,
-    @UploadedFile() file: Express.Multer.File,
-  ): Promise<RecordingEvent> {
-    const recording = await this.recordingsService.findOne(recordingId);
-
-    if (!recording) {
-      throw new RecordingNotFoundException(recordingId);
-    }
-
-    const recordingEvent = await this.recordingsService.getEventById(
-      recordingId,
-      eventId,
-    );
-
-    if (!recordingEvent) {
-      throw new RecordingEventNotFoundException(eventId);
-    }
-
-    if (!file) {
-      throw InvalidFileUploadException.noFile();
-    }
-
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw InvalidFileUploadException.invalidType();
-    }
-
-    return await this.recordingsService.addEventScreenshot(recordingId, eventId, file);
-  }
-
-  @Get(':recordingId/events/:eventId/screenshot')
-  async getEventScreenshot(
-    @Param('recordingId') recordingId: string,
-    @Param('eventId') eventId: string,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    try {
-      const recordingEvent = await this.recordingsService.getEventById(
-        recordingId,
-        eventId,
-      );
-
-      if (!recordingEvent) {
-        throw new RecordingEventNotFoundException(eventId);
-      }
-
-      const screenshotPath = this.recordingsService.getEventScreenshotPath(
-        recordingId,
-        eventId,
-      );
-
-      if (!screenshotPath) {
-        throw StorageException.fileNotFound(`Screenshot for event ${eventId}`);
-      }
-
-      if (!fs.existsSync(screenshotPath)) {
-        throw StorageException.fileNotFound(screenshotPath);
-      }
-
-      const file = fs.createReadStream(screenshotPath);
-      res.set({
-        'Content-Type': 'image/jpeg',
-        'Content-Disposition': `inline; filename="${eventId}.jpg"`,
-      });
-
-      return new StreamableFile(file);
-    } catch (error) {
-      if (
-        error instanceof RecordingNotFoundException ||
-        error instanceof RecordingEventNotFoundException ||
-        error instanceof StorageException
-      ) {
-        throw error;
-      }
-
-      throw new AppBaseException(
-        `Failed to get screenshot for event ${eventId}`,
-        500,
-        'GET_SCREENSHOT_FAILED',
-        { recordingId, eventId },
-      );
-    }
-  }
-
-  @Post(':recordingId/events/:eventId/regenerate-screenshot')
-  @Header('X-Content-Type-Options', 'nosniff')
-  @HttpCode(HttpStatus.OK)
-  async regenerateEventScreenshot(
-    @Param('recordingId') recordingId: string,
-    @Param('eventId') eventId: string,
-  ): Promise<RecordingEvent> {
-    try {
-      return await this.recordingsService.regenerateEventScreenshot(recordingId, eventId);
-    } catch (error) {
-      if (
-        error instanceof RecordingNotFoundException ||
-        error instanceof RecordingEventNotFoundException ||
-        error instanceof StorageException
-      ) {
-        throw error;
-      }
-
-      throw new AppBaseException(
-        `Failed to regenerate screenshot for event ${eventId}`,
-        500,
-        'REGENERATE_SCREENSHOT_FAILED',
-        {
-          recordingId,
-          eventId,
-          errorMessage: error instanceof Error ? error.message : String(error),
-        },
-      );
-    }
-  }
-
-  @Post(':recordingId/events/generate-all-screenshots')
-  @Header('X-Content-Type-Options', 'nosniff')
-  @HttpCode(HttpStatus.ACCEPTED)
-  async generateAllEventScreenshots(
-    @Param('recordingId') recordingId: string,
-  ): Promise<void> {
-    try {
-      await this.recordingsService.generateRecordingEventsScreenshots(recordingId);
-    } catch (error) {
-      if (
-        error instanceof RecordingNotFoundException ||
-        error instanceof StorageException
-      ) {
-        throw error;
-      }
-
-      throw new AppBaseException(
-        `Failed to generate screenshots for recording ${recordingId}`,
-        500,
-        'GENERATE_SCREENSHOTS_FAILED',
-        { recordingId },
-      );
-    }
-  }
-
-  @Patch(':recordingId/events/:eventId')
-  @Header('X-Content-Type-Options', 'nosniff')
-  @HttpCode(HttpStatus.OK)
-  async updateEvent(
-    @Param('recordingId') recordingId: string,
-    @Param('eventId') eventId: string,
-    @Body() updateEventDto: UpdateRecordingEventDto,
-  ): Promise<RecordingEvent> {
-    try {
-      return await this.recordingsService.updateEvent(
-        recordingId,
-        eventId,
-        updateEventDto,
-      );
-    } catch (error) {
-      if (
-        error instanceof RecordingNotFoundException ||
-        error instanceof RecordingEventNotFoundException
-      ) {
-        throw error;
-      }
-
-      throw new AppBaseException(
-        `Failed to update event ${eventId}`,
-        500,
-        'UPDATE_EVENT_FAILED',
-        { recordingId, eventId },
-      );
-    }
   }
 
   @Get(':id/guide')

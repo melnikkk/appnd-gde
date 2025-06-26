@@ -1,5 +1,5 @@
 import { IsNotEmpty, IsObject, IsUUID, IsNumber, IsEnum } from 'class-validator';
-import { RecordingEventType } from '../entities/recording-event.constants';
+import { RecordingEventType } from '../recording-event.constants';
 import { RecordingEventData } from '../entities/recording-events.types';
 
 export class CreateRecordingEventDto {

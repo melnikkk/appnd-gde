@@ -1,5 +1,5 @@
 import { IsUUID } from 'class-validator';
-import { RecordingEvent } from '../entities/recording-events.types';
+import { RecordingEvent } from '../../recording-events/entities/recording-events.types';
 
 export class GetRecordingRequestDto {
   @IsUUID()
@@ -21,5 +21,5 @@ export class GetRecordingResponseDto {
     width: number;
     height: number;
   };
-  events: Record<string, RecordingEvent>
+  events: Record<string, RecordingEvent>;
 }

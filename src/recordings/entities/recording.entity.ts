@@ -1,5 +1,5 @@
 import { Entity, PrimaryColumn, Column } from 'typeorm';
-import { RecordingEventsRecord } from './recording-events.types';
+import { RecordingEventsRecord } from '../../recording-events/entities/recording-events.types';
 
 interface ViewData {
   width: number;
@@ -40,7 +40,7 @@ export class Recording {
 
   @Column('jsonb', { nullable: true, default: {} })
   events: RecordingEventsRecord;
-  
+
   @Column('jsonb', { nullable: true })
   viewData: ViewData;
 }
