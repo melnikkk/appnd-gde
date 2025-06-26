@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { Recording } from './recording.entity';
-import { RecordingEventType } from './recording-event.constants';
+import { Recording } from '../../recordings/entities/recording.entity';
+import { RecordingEventType } from '../recording-event.constants';
 import { RecordingEventData } from './recording-events.types';
 
 @Entity('recording_events')

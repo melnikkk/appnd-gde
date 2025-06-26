@@ -1,20 +1,20 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  STORAGE_PROVIDER,
-  StorageProvider,
-} from '../../storage/interfaces/storage-provider.interface';
+import { StorageProvider } from '../../storage/interfaces/storage-provider.interface';
+import { STORAGE_PROVIDER } from '../../storage/interfaces/storage-provider.interface';
 import { AppBaseException } from '../../common/exceptions/base.exception';
+import { PathManagerService } from '../../storage/services/path-manager.service';
 
 @Injectable()
-export class ScreenshotService {
-  private readonly logger = new Logger(ScreenshotService.name);
+export class ScreenshotsService {
+  private readonly logger = new Logger(ScreenshotsService.name);
   private eventScreenshotPaths: Record<string, string> = {};
 
   constructor(
     @Inject(STORAGE_PROVIDER)
     private readonly storageProvider: StorageProvider,
+    private readonly pathManager: PathManagerService,
   ) {}
 
   async generateScreenshotAtTimestamp(
@@ -22,27 +22,16 @@ export class ScreenshotService {
     eventId: string,
     relativeTimestamp: number,
   ): Promise<void> {
-    try {
-      await this.storageProvider.generateScreenshotAtTimestamp(
-        videoPath,
-        eventId,
-        relativeTimestamp,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to generate screenshot at timestamp for event ${eventId}: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
+    await this.storageProvider.generateScreenshotAtTimestamp(
+      videoPath,
+      eventId,
+      relativeTimestamp,
+    );
   }
 
-  async saveEventScreenshot(
-    eventId: string,
-    file: Express.Multer.File,
-  ): Promise<string> {
+  async saveEventScreenshot(eventId: string, file: Express.Multer.File): Promise<string> {
     try {
-      const screenshotsDir = this.getScreenshotsDir();
+      const screenshotsDir = this.pathManager.getScreenshotsDir();
 
       if (!fs.existsSync(screenshotsDir)) {
         fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -55,11 +44,6 @@ export class ScreenshotService {
 
       return screenshotPath;
     } catch (error) {
-      this.logger.error(
-        `Failed to save screenshot for event ${eventId}: ${error.message}`,
-        error.stack,
-      );
-
       throw new AppBaseException(
         `Failed to save screenshot for event ${eventId}`,
         500,
@@ -71,7 +55,7 @@ export class ScreenshotService {
 
   getEventScreenshotPath(recordingId: string, eventId: string): string | null {
     const key = `${recordingId}-${eventId}`;
-    const screenshotsDir = this.getScreenshotsDir();
+    const screenshotsDir = this.pathManager.getScreenshotsDir();
 
     try {
       const files = fs
@@ -102,7 +86,7 @@ export class ScreenshotService {
 
   async deleteScreenshotByEventId(eventId: string): Promise<void> {
     try {
-      const screenshotsDir = this.getScreenshotsDir();
+      const screenshotsDir = this.pathManager.getScreenshotsDir();
 
       if (!fs.existsSync(screenshotsDir)) {
         return;
@@ -110,14 +94,16 @@ export class ScreenshotService {
 
       const files = fs
         .readdirSync(screenshotsDir)
-        .filter(file => file.startsWith(`${eventId}`) || file.startsWith(`${eventId}-`));
+        .filter(
+          (file) => file.startsWith(`${eventId}`) || file.startsWith(`${eventId}-`),
+        );
 
       for (const file of files) {
         try {
           const filePath = path.join(screenshotsDir, file);
 
           fs.unlinkSync(filePath);
-          
+
           this.logger.log(`Deleted event screenshot: ${filePath}`);
         } catch (deleteError) {
           this.logger.warn(`Failed to delete screenshot ${file}: ${deleteError.message}`);
@@ -125,24 +111,27 @@ export class ScreenshotService {
       }
 
       Object.keys(this.eventScreenshotPaths)
-        .filter(key => key.includes(eventId))
-        .forEach(key => delete this.eventScreenshotPaths[key]);
+        .filter((key) => key.includes(eventId))
+        .forEach((key) => delete this.eventScreenshotPaths[key]);
     } catch (error) {
-      this.logger.error(`Error deleting screenshots for event ${eventId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error deleting screenshots for event ${eventId}: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
   async deleteScreenshotsByRecordingId(recordingId: string): Promise<void> {
     try {
-      const screenshotsDir = this.getScreenshotsDir();
+      const screenshotsDir = this.pathManager.getScreenshotsDir();
 
       if (!fs.existsSync(screenshotsDir)) {
         return;
       }
 
       const eventIdsToDelete = Object.keys(this.eventScreenshotPaths)
-        .filter(key => key.startsWith(`${recordingId}-`))
-        .map(key => key.split('-')[1]);
+        .filter((key) => key.startsWith(`${recordingId}-`))
+        .map((key) => key.split('-')[1]);
 
       for (const eventId of eventIdsToDelete) {
         await this.deleteScreenshotByEventId(eventId);
@@ -150,11 +139,10 @@ export class ScreenshotService {
 
       this.logger.log(`Deleted all screenshots for recording ${recordingId}`);
     } catch (error) {
-      this.logger.error(`Error deleting screenshots for recording ${recordingId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error deleting screenshots for recording ${recordingId}: ${error.message}`,
+        error.stack,
+      );
     }
-  }
-
-  private getScreenshotsDir(): string {
-    return path.join(process.cwd(), 'uploads', 'event-screenshots');
   }
 }

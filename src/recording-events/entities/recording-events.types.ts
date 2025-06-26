@@ -1,4 +1,4 @@
-import { RecordingEventType } from './recording-event.constants';
+import { RecordingEventType } from '../recording-event.constants';
 
 export interface ClickRecordingEventData {
   coordinates: {

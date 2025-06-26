@@ -1,9 +1,4 @@
-import {
-  IsNotEmpty,
-  IsInt,
-  IsString,
-  IsUUID,
-} from 'class-validator';
+import { IsNotEmpty, IsInt, IsString, IsUUID } from 'class-validator';
 
 export class ViewDataDto {
   @IsNotEmpty()
@@ -13,18 +8,6 @@ export class ViewDataDto {
   @IsNotEmpty()
   @IsInt()
   height: number;
-}
-
-export class CreateRecordingDataDto {
-  @IsNotEmpty()
-  @IsInt()
-  startTime: number;
-
-  @IsInt()
-  stopTime: number;
-
-  @IsNotEmpty()
-  viewData: ViewDataDto;
 }
 
 export class CreateRecordingDto {

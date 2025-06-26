@@ -1,29 +1,29 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { RecordingCoreService } from './recording-core.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { RecordingStoreService } from '../../recordings-shared/services/recording-store.service';
 import {
   RecordingEvent,
   RecordingEventsRecord,
 } from '../entities/recording-events.types';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
-import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
+import { RecordingNotFoundException } from '../../recordings/exceptions/recording-not-found.exception';
 import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 import { AppBaseException } from '../../common/exceptions/base.exception';
-import { ScreenshotService } from './screenshot.service';
+import { ScreenshotsService } from '../../screenshots/services/screenshots.service';
 
 @Injectable()
-export class RecordingEventService {
-  private readonly logger = new Logger(RecordingEventService.name);
+export class RecordingEventsService {
+  private readonly logger = new Logger(RecordingEventsService.name);
 
   constructor(
-    private readonly recordingCoreService: RecordingCoreService,
-    private readonly screenshotService: ScreenshotService,
+    private readonly recordingStoreService: RecordingStoreService,
+    private readonly screenshotService: ScreenshotsService,
   ) {}
 
   async addEvents(
     recordingId: string,
     events: Record<string, CreateRecordingEventDto>,
   ): Promise<Record<string, RecordingEvent>> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -34,7 +34,7 @@ export class RecordingEventService {
         recording.events = {};
       }
 
-      const videoPath = this.recordingCoreService.getFilePath(recording.s3Key);
+      const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
 
       for (const [eventId, eventData] of Object.entries(events)) {
         try {
@@ -77,7 +77,7 @@ export class RecordingEventService {
         }
       }
 
-      await this.recordingCoreService.save(recording);
+      await this.recordingStoreService.save(recording);
 
       return this.formatEventsForResponse(recording.events, recordingId);
     } catch (error) {
@@ -153,7 +153,7 @@ export class RecordingEventService {
     recordingId: string,
     eventId: string,
   ): Promise<RecordingEvent | null> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -167,7 +167,7 @@ export class RecordingEventService {
   }
 
   async deleteEvent(recordingId: string, eventId: string): Promise<void> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -182,7 +182,7 @@ export class RecordingEventService {
 
       delete recording.events[eventId];
 
-      await this.recordingCoreService.save(recording);
+      await this.recordingStoreService.save(recording);
 
       this.logger.log(
         `Successfully deleted event ${eventId} from recording ${recordingId}`,
@@ -207,7 +207,7 @@ export class RecordingEventService {
     eventId: string,
     updateEventDto: Partial<RecordingEvent>,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -224,7 +224,7 @@ export class RecordingEventService {
         updateEventDto.timestamp !== undefined &&
         updateEventDto.timestamp !== currentEvent.timestamp
       ) {
-        const videoPath = this.recordingCoreService.getFilePath(recording.s3Key);
+        const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
         const relativeTimestamp =
           Math.max(0, updateEventDto.timestamp - recording.startTime) / 1000;
 
@@ -233,10 +233,6 @@ export class RecordingEventService {
             videoPath,
             eventId,
             relativeTimestamp,
-          );
-
-          this.logger.log(
-            `Regenerated screenshot for event ${eventId} at updated timestamp ${updateEventDto.timestamp}`,
           );
         } catch (screenshotError) {
           this.logger.warn(
@@ -253,11 +249,7 @@ export class RecordingEventService {
         screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
       };
 
-      await this.recordingCoreService.save(recording);
-
-      this.logger.log(
-        `Successfully updated event ${eventId} in recording ${recordingId}`,
-      );
+      await this.recordingStoreService.save(recording);
 
       return recording.events[eventId];
     } catch (error) {
@@ -280,7 +272,7 @@ export class RecordingEventService {
     eventId: string,
     file: Express.Multer.File,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -296,7 +288,7 @@ export class RecordingEventService {
       recording.events[eventId].screenshotUrl =
         `/recordings/${recordingId}/events/${eventId}/screenshot`;
 
-      await this.recordingCoreService.save(recording);
+      await this.recordingStoreService.save(recording);
 
       return {
         id: recording.events[eventId].id,
@@ -324,7 +316,7 @@ export class RecordingEventService {
     recordingId: string,
     eventId: string,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -336,7 +328,7 @@ export class RecordingEventService {
 
     try {
       const recordingEvent = recording.events[eventId];
-      const videoPath = this.recordingCoreService.getFilePath(recording.s3Key);
+      const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
 
       if (isNaN(recordingEvent.timestamp) || recordingEvent.timestamp < 0) {
         this.logger.warn(
@@ -358,7 +350,7 @@ export class RecordingEventService {
       recording.events[eventId].screenshotUrl =
         `/recordings/${recordingId}/events/${eventId}/screenshot`;
 
-      await this.recordingCoreService.save(recording);
+      await this.recordingStoreService.save(recording);
 
       return {
         id: recordingEvent.id,
@@ -383,7 +375,7 @@ export class RecordingEventService {
   }
 
   async generateRecordingEventsScreenshots(recordingId: string): Promise<void> {
-    const recording = await this.recordingCoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -394,7 +386,7 @@ export class RecordingEventService {
     }
 
     try {
-      const videoPath = this.recordingCoreService.getFilePath(recording.s3Key);
+      const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
 
       for (const [eventId, event] of Object.entries(recording.events)) {
         try {
@@ -425,13 +417,8 @@ export class RecordingEventService {
         }
       }
 
-      await this.recordingCoreService.save(recording);
+      await this.recordingStoreService.save(recording);
     } catch (error) {
-      this.logger.error(
-        `Failed to generate screenshots for recording ${recordingId}: ${error.message}`,
-        error.stack,
-      );
-
       throw new AppBaseException(
         `Failed to generate screenshots for recording ${recordingId}`,
         500,
@@ -443,7 +430,7 @@ export class RecordingEventService {
 
   async deleteAllEventsByRecordingId(recordingId: string): Promise<void> {
     try {
-      const recording = await this.recordingCoreService.findOne(recordingId);
+      const recording = await this.recordingStoreService.findOne(recordingId);
 
       if (!recording || !recording.events) {
         return;
@@ -455,17 +442,13 @@ export class RecordingEventService {
         return;
       }
 
-      this.logger.log(`Deleting ${eventIds.length} events for recording ${recordingId}`);
-
       for (const eventId of eventIds) {
         await this.screenshotService.deleteScreenshotByEventId(eventId);
       }
 
       recording.events = {};
 
-      await this.recordingCoreService.save(recording);
-
-      this.logger.log(`Successfully deleted all events for recording ${recordingId}`);
+      await this.recordingStoreService.save(recording);
     } catch (error) {
       this.logger.error(
         `Failed to delete events for recording ${recordingId}: ${error.message}`,
@@ -476,7 +459,7 @@ export class RecordingEventService {
 
   async getAllEventsByRecordingId(recordingId: string): Promise<RecordingEventsRecord> {
     try {
-      const recording = await this.recordingCoreService.findOne(recordingId);
+      const recording = await this.recordingStoreService.findOne(recordingId);
 
       if (!recording) {
         throw new RecordingNotFoundException(recordingId);
@@ -488,11 +471,6 @@ export class RecordingEventService {
 
       return this.formatEventsForResponse(recording.events, recordingId);
     } catch (error) {
-      this.logger.error(
-        `Failed to get events for recording ${recordingId}: ${error.message}`,
-        error.stack,
-      );
-
       throw new AppBaseException(
         `Failed to get events for recording ${recordingId}`,
         500,

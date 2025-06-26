@@ -4,8 +4,8 @@ import { Recording } from '../../recordings/entities/recording.entity';
 import {
   RecordingEvent,
   RecordingEventsRecord,
-} from '../../recordings/entities/recording-events.types';
-import { RecordingEventType } from '../../recordings/entities/recording-event.constants';
+} from '../../recording-events/entities/recording-events.types';
+import { RecordingEventType } from '../../recording-events/recording-event.constants';
 
 interface GuideStep {
   title: string;
@@ -35,19 +35,20 @@ export class GuideGeneratorService {
     });
   }
 
-  private convertEventsToGuideSteps(events: RecordingEventsRecord): GuideStep[] {
+  private convertEventsToGuideSteps(events: RecordingEventsRecord): Array<GuideStep> {
     const eventsArray: Array<RecordingEvent> = Object.values(events);
     const sortedEvents = eventsArray.sort((a, b) => a.timestamp - b.timestamp);
     const screenshotEvents = sortedEvents.filter((event) => event.screenshotUrl);
 
     return screenshotEvents.map((mainEvent, index) => {
       const nextScreenshotEvent = screenshotEvents[index + 1];
-      const nextTimestamp = nextScreenshotEvent ? nextScreenshotEvent.timestamp : Infinity;
-      
+      const nextTimestamp = nextScreenshotEvent
+        ? nextScreenshotEvent.timestamp
+        : Infinity;
+
       const relatedEvents = sortedEvents.filter(
-        (event) => 
-          event.timestamp >= mainEvent.timestamp && 
-          event.timestamp < nextTimestamp
+        (event) =>
+          event.timestamp >= mainEvent.timestamp && event.timestamp < nextTimestamp,
       );
 
       const step: GuideStep = {
@@ -76,7 +77,7 @@ export class GuideGeneratorService {
     switch (event.type) {
       case RecordingEventType.CLICK:
         const coordinates = event.data?.coordinates;
-        
+
         if (coordinates) {
           return `Click at position x: ${coordinates.x}, y: ${coordinates.y}`;
         }

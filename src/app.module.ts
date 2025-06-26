@@ -8,11 +8,15 @@ import { StorageModule } from './storage/storage.module';
 import { MediaModule } from './media/media.module';
 import { TemplatesModule } from './templates/templates.module';
 import { GuidesModule } from './guides/guides.module';
-import { MAX_UPLOADED_FILE_SIZE } from './recordings/recordings.constants';
+import { RecordingEventsModule } from './recording-events/recording-events.module';
+import { MAX_UPLOADED_FILE_SIZE } from './common/constants/media.constants';
+import { RecordingsSharedModule } from './recordings-shared/recordings-shared.module';
 
 @Module({
   imports: [
+    RecordingsSharedModule,
     RecordingsModule,
+    RecordingEventsModule,
     DatabaseModule,
     StorageModule,
     MediaModule,
