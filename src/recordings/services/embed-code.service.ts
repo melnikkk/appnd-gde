@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 interface EmbedCodeOptions {
   recordingId: string;
@@ -21,7 +21,7 @@ export class EmbedCodeService {
     containerId: string,
     encodedContent: string,
     serverUrl: string,
-    widthValue: string = '100%',
+    widthValue = '100%',
   ): string {
     return `
         <div id='${containerId}' style="width: ${widthValue}; height: 100%; overflow: auto; border: 1px solid #eee;"></div>

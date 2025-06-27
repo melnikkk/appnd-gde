@@ -29,7 +29,7 @@ export class ScreenshotsService {
     );
   }
 
-  async saveEventScreenshot(eventId: string, file: Express.Multer.File): Promise<string> {
+  saveEventScreenshot(eventId: string, file: Express.Multer.File): string {
     try {
       const screenshotsDir = this.pathManager.getScreenshotsDir();
 
@@ -84,7 +84,7 @@ export class ScreenshotsService {
     return null;
   }
 
-  async deleteScreenshotByEventId(eventId: string): Promise<void> {
+  deleteScreenshotByEventId(eventId: string): void {
     try {
       const screenshotsDir = this.pathManager.getScreenshotsDir();
 

@@ -11,6 +11,7 @@ import { GuidesModule } from './guides/guides.module';
 import { RecordingEventsModule } from './recording-events/recording-events.module';
 import { MAX_UPLOADED_FILE_SIZE } from './common/constants/media.constants';
 import { RecordingsSharedModule } from './recordings-shared/recordings-shared.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RecordingsSharedModule } from './recordings-shared/recordings-shared.mo
     MediaModule,
     TemplatesModule,
     GuidesModule,
+    AiModule,
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',

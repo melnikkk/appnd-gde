@@ -60,7 +60,7 @@ export class RecordingsController {
       throw InvalidFileUploadException.invalidType();
     }
 
-    return this.recordingsService.create(createRecordingDto, file);
+    return await this.recordingsService.create(createRecordingDto, file);
   }
 
   @Get(':id/source')

@@ -33,6 +33,7 @@ import {
 } from '../../common/constants/media.constants';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { RecordingEventsRecord } from '../entities/recording-events.types';
+import { GenerateAiContentDto } from '../dto/generate-ai-content.dto';
 
 @Controller('recordings')
 export class RecordingEventsController {
@@ -276,6 +277,33 @@ export class RecordingEventsController {
         500,
         'GENERATE_SCREENSHOTS_FAILED',
         { recordingId },
+      );
+    }
+  }
+
+  @Post(':recordingId/events/generate-ai-content')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Content-Type', 'application/json')
+  @HttpCode(HttpStatus.OK)
+  async generateAiContent(
+    @Param('recordingId') recordingId: string,
+    @Body() generateAiContentDto: GenerateAiContentDto,
+  ): Promise<RecordingEventsRecord> {
+    try {
+      return await this.recordingEventsService.generateAiContentForRecordingEvents(
+        recordingId,
+        generateAiContentDto,
+      );
+    } catch (error) {
+      if (error instanceof RecordingNotFoundException) {
+        throw error;
+      }
+
+      throw new AppBaseException(
+        `Failed to generate AI content for recording ${recordingId}`,
+        500,
+        'GENERATE_AI_CONTENT_FAILED',
+        { recordingId, error: error.message },
       );
     }
   }

@@ -5,7 +5,7 @@ export class AppBaseException extends HttpException {
     message: string,
     statusCode: HttpStatus,
     public readonly code: string,
-    public readonly details?: Record<string, any>,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(
       {

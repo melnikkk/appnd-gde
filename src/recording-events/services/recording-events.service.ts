@@ -9,6 +9,7 @@ import { RecordingNotFoundException } from '../../recordings/exceptions/recordin
 import { RecordingEventNotFoundException } from '../exceptions/recording-event-not-found.exceptions';
 import { AppBaseException } from '../../common/exceptions/base.exception';
 import { ScreenshotsService } from '../../screenshots/services/screenshots.service';
+import { RecordingEventAiService } from './recording-event-ai.service';
 
 @Injectable()
 export class RecordingEventsService {
@@ -17,6 +18,7 @@ export class RecordingEventsService {
   constructor(
     private readonly recordingStoreService: RecordingStoreService,
     private readonly screenshotService: ScreenshotsService,
+    private readonly recordingEventAiService: RecordingEventAiService,
   ) {}
 
   async addEvents(
@@ -55,13 +57,15 @@ export class RecordingEventsService {
             relativeTimestamp,
           );
 
-          recording.events[eventId] = {
+          const recordingEvent = {
             ...eventData,
             id: eventId,
-            title: eventData.title ?? eventId,
-            description: eventData.description ?? null,
+            title: eventData.title || eventId,
+            description: eventData.description || null,
             screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
           };
+
+          recording.events[eventId] = recordingEvent;
 
           this.logger.log(
             `Generated screenshot for event ${eventId} at timestamp ${eventData.timestamp}`,
@@ -75,7 +79,7 @@ export class RecordingEventsService {
           recording.events[eventId] = {
             ...eventData,
             id: eventId,
-            title: eventData.title ?? eventId,
+            title: eventData.title || eventId,
             description: eventData.description ?? null,
           };
         }
@@ -107,14 +111,6 @@ export class RecordingEventsService {
 
     for (const [eventId, event] of Object.entries(events)) {
       try {
-        if (!event || typeof event !== 'object') {
-          this.logger.warn(
-            `Skipping invalid event ${eventId} for recording ${recordingId}`,
-          );
-
-          continue;
-        }
-
         result[eventId] = {
           id: event.id,
           data: event.data,
@@ -463,6 +459,74 @@ export class RecordingEventsService {
         500,
         'GET_EVENTS_FAILED',
         { recordingId, error: error.message },
+      );
+    }
+  }
+
+  async generateAiContentForRecordingEvents(
+    recordingId: string,
+    options?: {
+      recordingPurpose?: string;
+      recordingDescription?: string;
+      companyName?: string;
+      industry?: string;
+      productContext?: string;
+    },
+  ): Promise<RecordingEventsRecord> {
+    const recording = await this.recordingStoreService.findOne(recordingId);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(recordingId);
+    }
+
+    if (Object.keys(recording.events).length === 0) {
+      return {};
+    }
+
+    try {
+      const additionalContext = {
+        recordingPurpose: options?.recordingPurpose,
+        recordingDescription: options?.recordingDescription,
+        companyName: options?.companyName,
+        industry: options?.industry,
+        productContext: options?.productContext,
+      };
+
+      const aiGeneratedContent =
+        await this.recordingEventAiService.fillRecordingEventsWithAiContent(
+          recording.events,
+          additionalContext,
+        );
+
+      for (const [eventId, content] of Object.entries(aiGeneratedContent)) {
+        if (recording.events[eventId]) {
+          recording.events[eventId].title = content.title;
+          recording.events[eventId].description = content.description;
+        }
+      }
+
+      await this.recordingStoreService.save(recording);
+
+      return this.formatEventsForResponse(recording.events, recordingId);
+    } catch (error) {
+      if (error instanceof AppBaseException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Failed to generate AI content for recording ${recordingId}: ${error.message}`,
+        error.stack,
+      );
+
+      throw new AppBaseException(
+        `Failed to generate AI content for recording with ID ${recordingId}`,
+        500,
+        'GENERATE_AI_CONTENT_FAILED',
+        {
+          recordingId,
+          eventCount: Object.keys(recording.events).length,
+          error,
+        },
       );
     }
   }

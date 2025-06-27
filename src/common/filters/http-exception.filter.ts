@@ -80,7 +80,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return 'INTERNAL_SERVER_ERROR';
   }
 
-  private getErrorDetails(exception: Error): Record<string, any> | undefined {
+  private getErrorDetails(exception: Error): Record<string, unknown> | undefined {
     if (exception instanceof AppBaseException) {
       return exception.details;
     }
