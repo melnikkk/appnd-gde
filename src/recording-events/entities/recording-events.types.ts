@@ -9,9 +9,7 @@ export interface ClickRecordingEventData {
 
 export type RecordingEventData = ClickRecordingEventData;
 
-export interface RecordingEventsRecord {
-  [recordingId: string]: RecordingEvent;
-}
+export type RecordingEventsRecord = Record<string, RecordingEvent>;
 
 export interface RecordingEvent {
   id: string;
@@ -19,4 +17,6 @@ export interface RecordingEvent {
   screenshotUrl?: string | null;
   data: RecordingEventData;
   type: RecordingEventType;
+  title: string;
+  description: string | null;
 }

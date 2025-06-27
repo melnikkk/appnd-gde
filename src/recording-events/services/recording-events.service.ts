@@ -58,6 +58,8 @@ export class RecordingEventsService {
           recording.events[eventId] = {
             ...eventData,
             id: eventId,
+            title: eventData.title ?? eventId,
+            description: eventData.description ?? null,
             screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
           };
 
@@ -73,6 +75,8 @@ export class RecordingEventsService {
           recording.events[eventId] = {
             ...eventData,
             id: eventId,
+            title: eventData.title ?? eventId,
+            description: eventData.description ?? null,
           };
         }
       }
@@ -111,29 +115,13 @@ export class RecordingEventsService {
           continue;
         }
 
-        if (!event.id || !event.type || event.timestamp === undefined) {
-          this.logger.warn(
-            `Event ${eventId} is missing required properties: ${JSON.stringify(event)}`,
-          );
-
-          result[eventId] = {
-            id: event.id || eventId,
-            data: event.data || {},
-            timestamp: event.timestamp,
-            type: event.type || 'unknown',
-            screenshotUrl:
-              event.screenshotUrl ??
-              `/recordings/${recordingId}/events/${eventId}/screenshot`,
-          };
-
-          continue;
-        }
-
         result[eventId] = {
           id: event.id,
           data: event.data,
           timestamp: event.timestamp,
           type: event.type,
+          title: event.title ?? eventId,
+          description: event.description ?? null,
           screenshotUrl:
             event.screenshotUrl ??
             `/recordings/${recordingId}/events/${eventId}/screenshot`,
@@ -295,6 +283,8 @@ export class RecordingEventsService {
         data: recording.events[eventId].data,
         timestamp: recording.events[eventId].timestamp,
         type: recording.events[eventId].type,
+        title: recording.events[eventId].title ?? eventId,
+        description: recording.events[eventId].description ?? null,
         screenshotUrl: recording.events[eventId].screenshotUrl,
       };
     } catch (error) {
@@ -353,10 +343,7 @@ export class RecordingEventsService {
       await this.recordingStoreService.save(recording);
 
       return {
-        id: recordingEvent.id,
-        data: recordingEvent.data,
-        timestamp: recordingEvent.timestamp,
-        type: recordingEvent.type,
+        ...recordingEvent,
         screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
       };
     } catch (error) {

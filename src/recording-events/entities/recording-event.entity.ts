@@ -17,6 +17,12 @@ export class RecordingEvent {
   @Column()
   type: RecordingEventType;
 
+  @Column({ nullable: false, default: () => 'id' })
+  title: string;
+
+  @Column({ nullable: true })
+  description: string;
+
   @ManyToOne(() => Recording, (recording) => recording.events)
   recording: Recording;
 }
