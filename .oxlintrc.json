@@ -49,6 +49,7 @@
 
     "eslint/init-declarations": "off",
     "eslint/func-style": "off",
+    "eslint/id-length": "off",
     "typescript/consistent-type-imports": "off",
     "max-lines-per-function": "off",
     "max-depth": "off",

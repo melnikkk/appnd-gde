@@ -20,7 +20,7 @@ export class LocalStorageService implements StorageProvider {
 
   constructor(
     private readonly pathManager: PathManagerService,
-    @Inject(forwardRef(() => MEDIA_PROCESSOR)) 
+    @Inject(forwardRef(() => MEDIA_PROCESSOR))
     private readonly mediaService: MediaProcessor,
   ) {
     this.checkFfmpegInstallation().then((installed) => {
@@ -34,6 +34,11 @@ export class LocalStorageService implements StorageProvider {
 
       return true;
     } catch (error) {
+      this.logger.error(
+        'FFmpeg binary not found. Media processing will not work.',
+        error,
+      );
+
       return false;
     }
   }
@@ -49,12 +54,13 @@ export class LocalStorageService implements StorageProvider {
       return this.pathManager.getRelativeFilePath(fileName);
     } catch (error) {
       this.logger.error(`Failed to save file: ${error.message}`, error.stack);
+
       throw StorageException.failedToSave(error);
     }
   }
 
   async generateThumbnail(filePath: string, id: string): Promise<string> {
-    return this.mediaService.generateThumbnail(filePath, id);
+    return await this.mediaService.generateThumbnail(filePath, id);
   }
 
   getFilePath(key: string): string {
@@ -90,7 +96,11 @@ export class LocalStorageService implements StorageProvider {
     eventId: string,
     timestamp: number,
   ): Promise<string> {
-    return this.mediaService.generateScreenshotAtTimestamp(videoPath, eventId, timestamp);
+    return await this.mediaService.generateScreenshotAtTimestamp(
+      videoPath,
+      eventId,
+      timestamp,
+    );
   }
 
   private async safelyHandleFile(
@@ -105,41 +115,45 @@ export class LocalStorageService implements StorageProvider {
   async downloadFile(url: string, destPath: string): Promise<void> {
     try {
       this.logger.log(`Downloading file from ${url} to ${destPath}`);
-      
+
       if (url.startsWith('/') || url.startsWith('file://')) {
         const sourcePath = url.startsWith('/') ? url : url.slice(7);
-        
+
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
         await fs.promises.copyFile(sourcePath, destPath);
         return;
       }
-      
+
       if (url.startsWith('http://') || url.startsWith('https://')) {
         const client = url.startsWith('https://') ? https : http;
-        
+
         await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-        
+
         const fileStream = fs.createWriteStream(destPath);
 
         await new Promise<void>((resolve, reject) => {
           const request = client.get(url, (response) => {
             if (response.statusCode !== 200) {
-              reject(new Error(`Failed to download: ${response.statusCode} ${response.statusMessage}`));
-              
+              reject(
+                new Error(
+                  `Failed to download: ${response.statusCode} ${response.statusMessage}`,
+                ),
+              );
+
               return;
             }
-            
+
             pipeline(response, fileStream)
               .then(() => resolve())
               .catch(reject);
           });
-          
+
           request.on('error', reject);
         });
-        
+
         return;
       }
-      
+
       throw new Error(`Unsupported URL protocol: ${url}`);
     } catch (error) {
       this.logger.error(`Failed to download file: ${error.message}`, error.stack);

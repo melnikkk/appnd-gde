@@ -17,7 +17,7 @@ export class MediaService implements MediaProcessor {
   private readonly DEFAULT_SCREENSHOT_TIMESTAMP = '0';
   private readonly DEFAULT_SCREENSHOT_SIZE = '1920x1080';
 
-  private ffmpegInstalled: boolean = false;
+  private ffmpegInstalled = false;
 
   constructor(
     @Inject(forwardRef(() => PATH_MANAGER))
@@ -50,7 +50,7 @@ export class MediaService implements MediaProcessor {
 
     this.checkFfmpegAvailability(filePath);
 
-    return this.createFfmpegScreenshot(filePath, thumbnailPath, {
+    return await this.createFfmpegScreenshot(filePath, thumbnailPath, {
       folder: this.pathManager.getThumbnailDir(),
       filename: thumbnailFileName,
       timestamp: this.DEFAULT_THUMBNAIL_TIMESTAMP,
@@ -147,7 +147,7 @@ export class MediaService implements MediaProcessor {
   private async generateScreenshot(videoPath: string, fileName: string): Promise<string> {
     const screenshotPath = this.pathManager.getScreenshotPath(fileName);
 
-    return this.createFfmpegScreenshot(videoPath, screenshotPath, {
+    return await this.createFfmpegScreenshot(videoPath, screenshotPath, {
       folder: this.pathManager.getScreenshotsDir(),
       filename: fileName,
       timestamp: this.DEFAULT_SCREENSHOT_TIMESTAMP,

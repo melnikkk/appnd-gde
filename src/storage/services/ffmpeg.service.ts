@@ -14,7 +14,7 @@ export class FfmpegService {
   private readonly DEFAULT_SCREENSHOT_SIZE = '1920x1080';
 
   private readonly logger = new Logger(FfmpegService.name);
-  private ffmpegInstalled: boolean = false;
+  private ffmpegInstalled = false;
 
   constructor(private readonly pathManager: PathManagerService) {}
 
@@ -23,9 +23,11 @@ export class FfmpegService {
 
     if (!installed) {
       this.logger.error('FFmpeg binary path not found. Media processing will not work.');
-    } else {
-      this.logger.log('FFmpeg found. Media processing ready.');
+
+      return;
     }
+
+    this.logger.log('FFmpeg found. Media processing ready.');
   }
 
   checkFfmpegAvailability(filePath: string): void {
@@ -44,7 +46,7 @@ export class FfmpegService {
 
     this.checkFfmpegAvailability(filePath);
 
-    return this.createFfmpegScreenshot(filePath, thumbnailPath, {
+    return await this.createFfmpegScreenshot(filePath, thumbnailPath, {
       folder: this.pathManager.getThumbnailDir(),
       filename: thumbnailFileName,
       timestamp: this.DEFAULT_THUMBNAIL_TIMESTAMP,
@@ -117,8 +119,8 @@ export class FfmpegService {
     }
   }
 
-  async getVideoDuration(videoPath: string): Promise<number> {
-    return new Promise((resolve, reject) => {
+  getVideoDuration(videoPath: string): Promise<number> {
+    return new Promise((resolve) => {
       ffmpeg.ffprobe(videoPath, (err, metadata) => {
         if (err) {
           this.logger.warn(`Could not probe video duration: ${err.message}`);
@@ -141,7 +143,7 @@ export class FfmpegService {
   private async generateScreenshot(videoPath: string, fileName: string): Promise<string> {
     const screenshotPath = this.pathManager.getScreenshotPath(fileName);
 
-    return this.createFfmpegScreenshot(videoPath, screenshotPath, {
+    return await this.createFfmpegScreenshot(videoPath, screenshotPath, {
       folder: this.pathManager.getScreenshotsDir(),
       filename: fileName,
       timestamp: this.DEFAULT_SCREENSHOT_TIMESTAMP,

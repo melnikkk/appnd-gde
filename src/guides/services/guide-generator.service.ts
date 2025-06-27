@@ -25,7 +25,7 @@ export class GuideGeneratorService {
   ): Promise<string> {
     const steps = this.convertEventsToGuideSteps(events);
 
-    return this.templatesService.render('step-guide', {
+    return await this.templatesService.render('step-guide', {
       steps,
       title: `How to ${recording.name}`,
       description:
@@ -74,17 +74,15 @@ export class GuideGeneratorService {
   }
 
   private generateStepDescription(event: RecordingEvent): string | undefined {
-    switch (event.type) {
-      case RecordingEventType.CLICK:
-        const coordinates = event.data?.coordinates;
+    if (event.type === RecordingEventType.CLICK) {
+      const coordinates = event.data?.coordinates;
 
-        if (coordinates) {
-          return `Click at position x: ${coordinates.x}, y: ${coordinates.y}`;
-        }
+      if (coordinates) {
+        return `Click at position x: ${coordinates.x}, y: ${coordinates.y}`;
+      }
 
-        return undefined;
-      default:
-        return undefined;
+      return undefined;
     }
+    return undefined;
   }
 }
