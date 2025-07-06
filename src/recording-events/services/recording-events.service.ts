@@ -465,13 +465,6 @@ export class RecordingEventsService {
 
   async generateAiContentForRecordingEvents(
     recordingId: string,
-    options?: {
-      recordingPurpose?: string;
-      recordingDescription?: string;
-      companyName?: string;
-      industry?: string;
-      productContext?: string;
-    },
   ): Promise<RecordingEventsRecord> {
     const recording = await this.recordingStoreService.findOne(recordingId);
 
@@ -484,18 +477,9 @@ export class RecordingEventsService {
     }
 
     try {
-      const additionalContext = {
-        recordingPurpose: options?.recordingPurpose,
-        recordingDescription: options?.recordingDescription,
-        companyName: options?.companyName,
-        industry: options?.industry,
-        productContext: options?.productContext,
-      };
-
       const aiGeneratedContent =
         await this.recordingEventAiService.fillRecordingEventsWithAiContent(
           recording.events,
-          additionalContext,
         );
 
       for (const [eventId, content] of Object.entries(aiGeneratedContent)) {
