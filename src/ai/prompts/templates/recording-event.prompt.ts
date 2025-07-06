@@ -1,56 +1,36 @@
 export const RECORDING_EVENT_PROMPT = `
 Generate a concise title and detailed description for a web recording event based on the following data:
 
-EVENT TYPE: {{eventType}}
+EVENT TYPE: <%= eventType %>
 
 TARGET ELEMENT:
-- Type: {{targetElementType}}
-- ID/Name: {{targetElementId}}
-- Text: {{targetElementText}}
-- ARIA Label: {{targetElementAriaLabel}}
+- Type: <%= targetElementType %>
+- ID/Name: <%= targetElementId %>
+- Text: <%= targetElementText %>
+- ARIA Label: <%= targetElementAriaLabel %>
 
 PAGE CONTEXT:
-- URL: {{pageUrl}}
-- Title: {{pageTitle}}
-{{#if parentElements}}
-- Parent Elements: {{parentElements}}
-{{/if}}
+- URL: <%= pageUrl %>
+- Title: <%= pageTitle %>
+
+<% if (parentElements) { %>
+- Parent Elements: <%= parentElements %>
+<% } %>
 
 USER INTERACTION:
-{{#if userInteraction}}
-{{#if userInteraction.inputValue}}
-- Input Value: {{userInteraction.inputValue}}
-{{/if}}
-{{#if userInteraction.selectedOptions}}
-- Selected Options: {{userInteraction.selectedOptions}}
-{{/if}}
-{{#if userInteraction.isChecked}}
-- Checked: {{userInteraction.isChecked}}
-{{/if}}
-{{else}}
+<% if (userInteraction) { %>
+<% if (userInteraction.inputValue) { %>
+- Input Value: <%= userInteraction.inputValue %>
+<% } %>
+<% if (userInteraction.selectedOptions) { %>
+- Selected Options: <%= userInteraction.selectedOptions %>
+<% } %>
+<% if (userInteraction.isChecked !== undefined) { %>
+- Checked: <%= userInteraction.isChecked %>
+<% } %>
+<% } else { %>
 - No specific interaction data available
-{{/if}}
-
-ADDITIONAL CONTEXT:
-{{#if additionalContext}}
-{{#if additionalContext.companyName}}
-- Company: {{additionalContext.companyName}}
-{{/if}}
-{{#if additionalContext.industry}}
-- Industry: {{additionalContext.industry}}
-{{/if}}
-{{#if additionalContext.productContext}}
-- Product Context: {{additionalContext.productContext}}
-{{/if}}
-{{#if additionalContext.recordingPurpose}}
-- Recording Purpose: {{additionalContext.recordingPurpose}}
-{{/if}}
-{{#if additionalContext.recordingDescription}}
-- Recording Description: {{additionalContext.recordingDescription}}
-{{/if}}
-{{else}}
-- No additional context available
-{{/if}}
+<% } %>
 
 INSTRUCTIONS:
 1. Generate a SHORT, CONCISE title (5-7 words maximum) that clearly describes the user action.
@@ -60,10 +40,15 @@ INSTRUCTIONS:
 5. Avoid technical jargon unless necessary.
 6. Use active voice and present tense for the title.
 7. Return your response in JSON format.
+8. Don't mention that you don't have some information. such as an unspecified event, an unknown event, etc.
+9. If any fields are missing, do not include them in the output.
+10. Describe the event from the teaching position. Imagine that you try to help someone understand the process step by step.
+11. Use the imperative mood.
 
-Format your response as a JSON object:
+RESPONSE. Format your response as a JSON object:
 {
-  "title": "A concise, specific title that describes the action taken",
-  "description": "A detailed description of the event, including context and purpose"
+"title": "A concise, specific title that describes the action taken",
+"description": "A detailed description of the event, including context and purpose"
+"eventId": id of the provided event
 }
 `;

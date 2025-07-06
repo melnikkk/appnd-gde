@@ -33,7 +33,6 @@ import {
 } from '../../common/constants/media.constants';
 import { CreateRecordingEventDto } from '../dto/create-recording-event.dto';
 import { RecordingEventsRecord } from '../entities/recording-events.types';
-import { GenerateAiContentDto } from '../dto/generate-ai-content.dto';
 
 @Controller('recordings')
 export class RecordingEventsController {
@@ -287,12 +286,10 @@ export class RecordingEventsController {
   @HttpCode(HttpStatus.OK)
   async generateAiContent(
     @Param('recordingId') recordingId: string,
-    @Body() generateAiContentDto: GenerateAiContentDto,
   ): Promise<RecordingEventsRecord> {
     try {
       return await this.recordingEventsService.generateAiContentForRecordingEvents(
         recordingId,
-        generateAiContentDto,
       );
     } catch (error) {
       if (error instanceof RecordingNotFoundException) {
