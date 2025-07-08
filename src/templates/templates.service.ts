@@ -15,7 +15,7 @@ export class TemplatesService {
     }
   }
 
-  render(templateName: string, data: Record<string, unknown>): Promise<string> {
+  render(templateName: string, data: Record<string, unknown>): string {
     const templatePath = path.join(this.templatesDir, `${templateName}.ejs`);
 
     if (!fs.existsSync(templatePath)) {

@@ -10,6 +10,7 @@ import { RecordingEventNotFoundException } from '../exceptions/recording-event-n
 import { AppBaseException } from '../../common/exceptions/base.exception';
 import { ScreenshotsService } from '../../screenshots/services/screenshots.service';
 import { RecordingEventAiService } from './recording-event-ai.service';
+import { RecordingEventFactoryService } from './recording-event-factory.service';
 
 @Injectable()
 export class RecordingEventsService {
@@ -19,6 +20,7 @@ export class RecordingEventsService {
     private readonly recordingStoreService: RecordingStoreService,
     private readonly screenshotService: ScreenshotsService,
     private readonly recordingEventAiService: RecordingEventAiService,
+    private readonly recordingEventFactoryService: RecordingEventFactoryService,
   ) {}
 
   async addEvents(
@@ -39,55 +41,64 @@ export class RecordingEventsService {
       const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
 
       for (const [eventId, eventData] of Object.entries(events)) {
-        try {
-          if (isNaN(eventData.timestamp) || eventData.timestamp < 0) {
-            this.logger.warn(
-              `Invalid timestamp for event ${eventId}: ${eventData.timestamp}. Using default value of 0.`,
+        const eventModel = this.recordingEventFactoryService.createRecordingEvent(
+          eventData as RecordingEvent,
+        );
+
+        if (eventModel.isScreenshotAvailable()) {
+          try {
+            if (isNaN(eventData.timestamp) || eventData.timestamp < 0) {
+              this.logger.warn(
+                `Invalid timestamp for event ${eventId}: ${eventData.timestamp}. Using default value of 0.`,
+              );
+
+              eventData.timestamp = 0;
+            }
+
+            const relativeTimestamp =
+              Math.max(0, eventData.timestamp - recording.startTime) / 1000;
+
+            await this.screenshotService.generateScreenshotAtTimestamp(
+              videoPath,
+              eventId,
+              relativeTimestamp,
             );
 
-            eventData.timestamp = 0;
+            recording.events[eventId] = {
+              ...eventData,
+              id: eventId,
+              title: eventData.title || eventId,
+              description: eventData.description || null,
+              screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
+            };
+          } catch (screenshotError) {
+            this.logger.warn(
+              `Failed to generate screenshot for event ${eventId}: ${screenshotError.message}`,
+              screenshotError.stack,
+            );
+
+            recording.events[eventId] = {
+              ...eventData,
+              id: eventId,
+              title: eventData.title || eventId,
+              description: eventData.description ?? null,
+              screenshotUrl: null,
+            };
           }
-
-          const relativeTimestamp =
-            Math.max(0, eventData.timestamp - recording.startTime) / 1000;
-
-          await this.screenshotService.generateScreenshotAtTimestamp(
-            videoPath,
-            eventId,
-            relativeTimestamp,
-          );
-
-          const recordingEvent = {
-            ...eventData,
-            id: eventId,
-            title: eventData.title || eventId,
-            description: eventData.description || null,
-            screenshotUrl: `/recordings/${recordingId}/events/${eventId}/screenshot`,
-          };
-
-          recording.events[eventId] = recordingEvent;
-
-          this.logger.log(
-            `Generated screenshot for event ${eventId} at timestamp ${eventData.timestamp}`,
-          );
-        } catch (screenshotError) {
-          this.logger.warn(
-            `Failed to generate screenshot for event ${eventId}: ${screenshotError.message}`,
-            screenshotError.stack,
-          );
-
+        } else {
           recording.events[eventId] = {
             ...eventData,
             id: eventId,
             title: eventData.title || eventId,
             description: eventData.description ?? null,
+            screenshotUrl: null,
           };
         }
       }
 
       await this.recordingStoreService.save(recording);
 
-      return this.formatEventsForResponse(recording.events, recordingId);
+      return this.formatEventsForResponse(recording.events);
     } catch (error) {
       this.logger.error(
         `Failed to add events to recording ${recordingId}: ${error.message}`,
@@ -105,7 +116,6 @@ export class RecordingEventsService {
 
   formatEventsForResponse(
     events: Record<string, RecordingEvent>,
-    recordingId: string,
   ): Record<string, RecordingEvent> {
     const result: Record<string, RecordingEvent> = {};
 
@@ -118,9 +128,7 @@ export class RecordingEventsService {
           type: event.type,
           title: event.title ?? eventId,
           description: event.description ?? null,
-          screenshotUrl:
-            event.screenshotUrl ??
-            `/recordings/${recordingId}/events/${eventId}/screenshot`,
+          screenshotUrl: event.screenshotUrl,
         };
       } catch (error) {
         this.logger.error(
@@ -147,7 +155,9 @@ export class RecordingEventsService {
       return null;
     }
 
-    return recording.events[eventId];
+    return this.recordingEventFactoryService.createRecordingEvent(
+      recording.events[eventId],
+    );
   }
 
   async deleteEvent(recordingId: string, eventId: string): Promise<void> {
@@ -167,10 +177,6 @@ export class RecordingEventsService {
       delete recording.events[eventId];
 
       await this.recordingStoreService.save(recording);
-
-      this.logger.log(
-        `Successfully deleted event ${eventId} from recording ${recordingId}`,
-      );
     } catch (error) {
       this.logger.error(
         `Failed to delete event ${eventId} from recording ${recordingId}: ${error.message}`,
@@ -204,9 +210,15 @@ export class RecordingEventsService {
     try {
       const currentEvent = recording.events[eventId];
 
+      const eventModel = this.recordingEventFactoryService.createRecordingEvent({
+        ...currentEvent,
+        ...updateEventDto,
+      });
+
       if (
         updateEventDto.timestamp !== undefined &&
-        updateEventDto.timestamp !== currentEvent.timestamp
+        updateEventDto.timestamp !== currentEvent.timestamp &&
+        eventModel.isScreenshotAvailable()
       ) {
         const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
         const relativeTimestamp =
@@ -235,7 +247,9 @@ export class RecordingEventsService {
 
       await this.recordingStoreService.save(recording);
 
-      return recording.events[eventId];
+      return this.recordingEventFactoryService.createRecordingEvent(
+        recording.events[eventId],
+      );
     } catch (error) {
       this.logger.error(
         `Failed to update event ${eventId} in recording ${recordingId}: ${error.message}`,
@@ -267,6 +281,17 @@ export class RecordingEventsService {
     }
 
     try {
+      const eventModel = this.recordingEventFactoryService.createRecordingEvent(
+        recording.events[eventId],
+      );
+
+      if (!eventModel.isScreenshotAvailable()) {
+        return {
+          ...recording.events[eventId],
+          screenshotUrl: null,
+        };
+      }
+
       await this.screenshotService.saveEventScreenshot(eventId, file);
 
       recording.events[eventId].screenshotUrl =
@@ -314,13 +339,20 @@ export class RecordingEventsService {
 
     try {
       const recordingEvent = recording.events[eventId];
+
+      const eventModel =
+        this.recordingEventFactoryService.createRecordingEvent(recordingEvent);
+
+      if (!eventModel.isScreenshotAvailable()) {
+        return {
+          ...recordingEvent,
+          screenshotUrl: null,
+        };
+      }
+
       const videoPath = this.recordingStoreService.getFilePath(recording.s3Key);
 
       if (isNaN(recordingEvent.timestamp) || recordingEvent.timestamp < 0) {
-        this.logger.warn(
-          `Invalid timestamp for event ${eventId}: ${recordingEvent.timestamp}. Using default value of 0.`,
-        );
-
         recordingEvent.timestamp = 0;
       }
 
@@ -373,25 +405,26 @@ export class RecordingEventsService {
 
       for (const [eventId, event] of Object.entries(recording.events)) {
         try {
-          if (isNaN(event.timestamp) || event.timestamp < 0) {
-            this.logger.warn(
-              `Invalid timestamp for event ${eventId}: ${event.timestamp}. Using default value of 0.`,
+          const eventModel =
+            this.recordingEventFactoryService.createRecordingEvent(event);
+
+          if (eventModel.isScreenshotAvailable()) {
+            if (isNaN(event.timestamp) || event.timestamp < 0) {
+              event.timestamp = 0;
+            }
+
+            const relativeTimestamp =
+              Math.max(0, event.timestamp - recording.startTime) / 1000;
+
+            await this.screenshotService.generateScreenshotAtTimestamp(
+              videoPath,
+              eventId,
+              relativeTimestamp,
             );
 
-            event.timestamp = 0;
+            recording.events[eventId].screenshotUrl =
+              `/recordings/${recordingId}/events/${eventId}/screenshot`;
           }
-
-          const relativeTimestamp =
-            Math.max(0, event.timestamp - recording.startTime) / 1000;
-
-          await this.screenshotService.generateScreenshotAtTimestamp(
-            videoPath,
-            eventId,
-            relativeTimestamp,
-          );
-
-          recording.events[eventId].screenshotUrl =
-            `/recordings/${recordingId}/events/${eventId}/screenshot`;
         } catch (screenshotError) {
           this.logger.warn(
             `Failed to generate screenshots for event ${eventId}: ${screenshotError.message}`,
@@ -452,7 +485,9 @@ export class RecordingEventsService {
         return {};
       }
 
-      return this.formatEventsForResponse(recording.events, recordingId);
+      const formattedEvents = this.formatEventsForResponse(recording.events);
+
+      return formattedEvents;
     } catch (error) {
       throw new AppBaseException(
         `Failed to get events for recording ${recordingId}`,
@@ -472,26 +507,39 @@ export class RecordingEventsService {
       throw new RecordingNotFoundException(recordingId);
     }
 
-    if (Object.keys(recording.events).length === 0) {
+    const recordingEventModels = this.recordingEventFactoryService.createRecordingEvents(
+      Object.values(recording.events),
+    );
+
+    const haveEvents = recordingEventModels.length > 0;
+    const aiGeneratableRecordingEvents = recordingEventModels.filter((event) =>
+      event.isAiGeneratable(),
+    );
+    const shouldGenerateAiContent = haveEvents && aiGeneratableRecordingEvents.length > 0;
+
+    if (shouldGenerateAiContent) {
       return {};
     }
 
     try {
       const aiGeneratedContent =
         await this.recordingEventAiService.fillRecordingEventsWithAiContent(
-          recording.events,
+          aiGeneratableRecordingEvents,
         );
 
       for (const [eventId, content] of Object.entries(aiGeneratedContent)) {
-        if (recording.events[eventId]) {
-          recording.events[eventId].title = content.title;
-          recording.events[eventId].description = content.description;
-        }
+        const event = this.recordingEventFactoryService.createRecordingEvent(
+          recording.events[eventId],
+        );
+
+        event.title = content.title;
+        event.description = content.description;
+        recording.events[eventId] = event;
       }
 
       await this.recordingStoreService.save(recording);
 
-      return this.formatEventsForResponse(recording.events, recordingId);
+      return this.formatEventsForResponse(recording.events);
     } catch (error) {
       if (error instanceof AppBaseException) {
         throw error;

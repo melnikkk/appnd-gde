@@ -91,7 +91,7 @@ export class GeminiAiService implements AiService {
       });
 
       const result = await model.generateContent(prompt);
-
+      this.logger.log(`Generated content`, result);
       return this.parseBatchResponse(result);
     } catch (error) {
       if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
