@@ -4,6 +4,7 @@ import { Recording } from '../../recordings/entities/recording.entity';
 import {
   RecordingEvent,
   RecordingEventsRecord,
+  ClickRecordingEventData,
 } from '../../recording-events/entities/recording-events.types';
 import { RecordingEventType } from '../../recording-events/recording-event.constants';
 
@@ -75,7 +76,7 @@ export class GuideGeneratorService {
 
   private generateStepDescription(event: RecordingEvent): string | undefined {
     if (event.type === RecordingEventType.CLICK) {
-      const coordinates = event.data?.coordinates;
+      const coordinates = (event.data as ClickRecordingEventData)?.coordinates;
 
       if (coordinates) {
         return `Click at position x: ${coordinates.x}, y: ${coordinates.y}`;

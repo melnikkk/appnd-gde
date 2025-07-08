@@ -1,4 +1,8 @@
 import { RecordingEventType } from '../recording-event.constants';
+import { ClickRecordingEvent } from '../models/click-recording-event.model';
+
+export type AiGeneratableRecordingEvent = ClickRecordingEvent;
+export type ScreenshotAvailableRecordingEvent = ClickRecordingEvent;
 
 export interface TargetElement {
   elementType?: string;
@@ -41,16 +45,21 @@ export interface ClickRecordingEventData {
   additionalContext?: Record<string, unknown>;
 }
 
-export type RecordingEventData = ClickRecordingEventData;
+export interface UrlChangeRecordingEventData {
+  newUrl: string;
+  previousUrl: string;
+}
+
+export type RecordingEventData = ClickRecordingEventData | UrlChangeRecordingEventData;
 
 export type RecordingEventsRecord = Record<string, RecordingEvent>;
 
 export interface RecordingEvent {
-  id: string;
   timestamp: number;
-  screenshotUrl?: string | null;
-  data: RecordingEventData;
-  type: RecordingEventType;
+  id: string;
   title: string;
   description: string | null;
+  screenshotUrl: string | null;
+  data: RecordingEventData;
+  type: RecordingEventType;
 }

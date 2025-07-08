@@ -7,6 +7,7 @@ import { RecordingEventsController } from './controllers/recording-events.contro
 import { RecordingsSharedModule } from '../recordings-shared/recordings-shared.module';
 import { RecordingEventAiService } from './services/recording-event-ai.service';
 import { AiModule } from '../ai/ai.module';
+import { RecordingEventFactoryService } from './services/recording-event-factory.service';
 
 @Module({
   imports: [
@@ -15,8 +16,16 @@ import { AiModule } from '../ai/ai.module';
     RecordingsSharedModule,
     AiModule,
   ],
-  providers: [RecordingEventsService, RecordingEventAiService],
-  exports: [RecordingEventsService, RecordingEventAiService],
+  providers: [
+    RecordingEventsService,
+    RecordingEventAiService,
+    RecordingEventFactoryService,
+  ],
+  exports: [
+    RecordingEventsService,
+    RecordingEventAiService,
+    RecordingEventFactoryService,
+  ],
   controllers: [RecordingEventsController],
 })
 export class RecordingEventsModule {}
