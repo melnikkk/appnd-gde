@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import * as path from 'path';
 import { Recording } from '../entities/recording.entity';
 import { CreateRecordingDto } from '../dto/create-recording.dto';
+import { UpdateRecordingDto } from '../dto/update-recording.dto';
 import { GuideGeneratorService } from '../../guides/services/guide-generator.service';
 import { EmbedCodeService } from './embed-code.service';
 import { ScreenshotsService } from '../../screenshots/services/screenshots.service';
@@ -11,6 +12,7 @@ import { RecordingStoreService } from '../../recordings-shared/services/recordin
 import { STORAGE_PROVIDER } from '../../storage/interfaces/storage-provider.interface';
 import { StorageProvider } from '../../storage/interfaces/storage-provider.interface';
 import { AppBaseException } from '../../common/exceptions/base.exception';
+import { RecordingNotFoundException } from '../exceptions/recording-not-found.exception';
 
 @Injectable()
 export class RecordingsService {
@@ -91,6 +93,34 @@ export class RecordingsService {
         'Failed to create recording',
         500,
         'RECORDING_CREATE_FAILED',
+        { originalError: error.message },
+      );
+    }
+  }
+
+  async update(
+    id: string,
+    updateRecordingDto: Partial<UpdateRecordingDto>,
+  ): Promise<Recording> {
+    try {
+      const recording = await this.recordingStoreService.findOne(id);
+
+      if (!recording) {
+        throw new RecordingNotFoundException(id);
+      }
+
+      Object.assign(recording, updateRecordingDto);
+
+      return await this.recordingsRepository.save(recording);
+    } catch (error) {
+      if (error instanceof AppBaseException) {
+        throw error;
+      }
+
+      throw new AppBaseException(
+        'Failed to update recording',
+        500,
+        'RECORDING_UPDATE_FAILED',
         { originalError: error.message },
       );
     }
