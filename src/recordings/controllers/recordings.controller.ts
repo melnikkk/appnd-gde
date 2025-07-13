@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   UseInterceptors,
@@ -34,6 +35,7 @@ import {
   MAX_UPLOADED_FILE_SIZE,
 } from '../../common/constants/media.constants';
 import { Recording } from '../entities/recording.entity';
+import { UpdateRecordingDto } from '../dto/update-recording.dto';
 
 @Controller('recordings')
 export class RecordingsController {
@@ -61,6 +63,21 @@ export class RecordingsController {
     }
 
     return await this.recordingsService.create(createRecordingDto, file);
+  }
+
+  @Patch(':id')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async updateRecording(
+    @Param('id') id: string,
+    @Body() updateRecordingDto: Partial<UpdateRecordingDto>,
+  ): Promise<Recording> {
+    const recording = await this.recordingsService.findOne(id);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(id);
+    }
+
+    return await this.recordingsService.update(id, updateRecordingDto);
   }
 
   @Get(':id/source')
