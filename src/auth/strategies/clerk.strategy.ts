@@ -27,11 +27,18 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
     }
 
     try {
-      const sessionClaims = await this.clerkClient.verifyToken(token);
-      const user = await this.clerkClient.users.getUser(sessionClaims.sub);
+      const verificationResult = await this.clerkClient.verifyToken(token);
+      const { sub, sid } = verificationResult;
+
+      if (!sub) {
+        throw new InvalidTokenException('Token subject is missing');
+      }
+
+      const user = await this.clerkClient.users.getUser(sub);
 
       return {
         id: user.id,
+        sessionId: sid,
         email: user.emailAddresses[0]?.emailAddress,
         firstName: user.firstName,
         lastName: user.lastName,
