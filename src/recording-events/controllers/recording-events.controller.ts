@@ -17,6 +17,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as fs from 'node:fs';
 import { Response } from 'express';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { User } from '../../auth/interfaces/user.interface';
 import { RecordingEventsService } from '../services/recording-events.service';
 import { UpdateRecordingEventDto } from '../dto/update-recording-event.dto';
 import { RecordingEvent } from '../entities/recording-events.types';
@@ -46,14 +48,18 @@ export class RecordingEventsController {
   @Header('X-Content-Type-Options', 'nosniff')
   async getEvents(
     @Param('recordingId') recordingId: string,
+    @CurrentUser() user: User,
   ): Promise<RecordingEventsRecord> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
     }
 
-    return await this.recordingEventsService.getAllEventsByRecordingId(recordingId);
+    return await this.recordingEventsService.getAllEventsByRecordingId(
+      recordingId,
+      user.id,
+    );
   }
 
   @Post(':recordingId/events')
@@ -63,8 +69,24 @@ export class RecordingEventsController {
   async addEvents(
     @Param('recordingId') recordingId: string,
     @Body() { events }: { events: Record<string, CreateRecordingEventDto> },
+    @CurrentUser() user: User,
   ): Promise<Record<string, RecordingEvent>> {
-    return await this.recordingEventsService.addEvents(recordingId, events);
+    const recording = await this.recordingStoreService.findOne(recordingId, user.id);
+
+    if (!recording) {
+      throw new RecordingNotFoundException(recordingId);
+    }
+
+    const eventsWithUserId = Object.entries(events).reduce(
+      (acc, [key, event]) => {
+        acc[key] = { ...event, userId: user.id };
+
+        return acc;
+      },
+      {} as Record<string, CreateRecordingEventDto>,
+    );
+
+    return await this.recordingEventsService.addEvents(recordingId, eventsWithUserId);
   }
 
   @Delete(':recordingId/events/:eventId')
@@ -72,8 +94,9 @@ export class RecordingEventsController {
   async deleteEvent(
     @Param('recordingId') recordingId: string,
     @Param('eventId') eventId: string,
+    @CurrentUser() user: User,
   ): Promise<void> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -82,13 +105,14 @@ export class RecordingEventsController {
     const recordingEvent = await this.recordingEventsService.getEventById(
       recordingId,
       eventId,
+      user.id,
     );
 
     if (!recordingEvent) {
       throw new RecordingEventNotFoundException(eventId);
     }
 
-    await this.recordingEventsService.deleteEvent(recordingId, eventId);
+    await this.recordingEventsService.deleteEvent(recordingId, eventId, user.id);
   }
 
   @Patch(':recordingId/events/:eventId')
@@ -98,12 +122,14 @@ export class RecordingEventsController {
     @Param('recordingId') recordingId: string,
     @Param('eventId') eventId: string,
     @Body() updateEventDto: UpdateRecordingEventDto,
+    @CurrentUser() user: User,
   ): Promise<RecordingEvent> {
     try {
       return await this.recordingEventsService.updateEvent(
         recordingId,
         eventId,
         updateEventDto,
+        user.id,
       );
     } catch (error) {
       if (
@@ -128,11 +154,13 @@ export class RecordingEventsController {
   async regenerateEventScreenshot(
     @Param('recordingId') recordingId: string,
     @Param('eventId') eventId: string,
+    @CurrentUser() user: User,
   ): Promise<RecordingEvent> {
     try {
       return await this.recordingEventsService.regenerateEventScreenshot(
         recordingId,
         eventId,
+        user.id,
       );
     } catch (error) {
       if (
@@ -162,11 +190,13 @@ export class RecordingEventsController {
     @Param('recordingId') recordingId: string,
     @Param('eventId') eventId: string,
     @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: User,
   ): Promise<StreamableFile> {
     try {
       const recordingEvent = await this.recordingEventsService.getEventById(
         recordingId,
         eventId,
+        user.id,
       );
 
       if (!recordingEvent) {
@@ -224,8 +254,9 @@ export class RecordingEventsController {
     @Param('recordingId') recordingId: string,
     @Param('eventId') eventId: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: User,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -234,6 +265,7 @@ export class RecordingEventsController {
     const recordingEvent = await this.recordingEventsService.getEventById(
       recordingId,
       eventId,
+      user.id,
     );
 
     if (!recordingEvent) {
@@ -252,6 +284,7 @@ export class RecordingEventsController {
       recordingId,
       eventId,
       file,
+      user.id,
     );
   }
 
@@ -260,9 +293,13 @@ export class RecordingEventsController {
   @HttpCode(HttpStatus.ACCEPTED)
   async generateAllEventScreenshots(
     @Param('recordingId') recordingId: string,
+    @CurrentUser() user: User,
   ): Promise<void> {
     try {
-      await this.recordingEventsService.generateRecordingEventsScreenshots(recordingId);
+      await this.recordingEventsService.generateRecordingEventsScreenshots(
+        recordingId,
+        user.id,
+      );
     } catch (error) {
       if (
         error instanceof RecordingNotFoundException ||
@@ -286,10 +323,12 @@ export class RecordingEventsController {
   @HttpCode(HttpStatus.OK)
   async generateAiContent(
     @Param('recordingId') recordingId: string,
+    @CurrentUser() user: User,
   ): Promise<RecordingEventsRecord> {
     try {
       return await this.recordingEventsService.generateAiContentForRecordingEvents(
         recordingId,
+        user.id,
       );
     } catch (error) {
       if (error instanceof RecordingNotFoundException) {

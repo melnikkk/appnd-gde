@@ -12,6 +12,9 @@ export class Recording {
   id: string;
 
   @Column()
+  userId: string;
+
+  @Column()
   name: string;
 
   @Column({ nullable: true })

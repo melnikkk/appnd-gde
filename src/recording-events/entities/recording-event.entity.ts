@@ -8,6 +8,9 @@ export class RecordingEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column()
+  userId: string;
+
   @Column('jsonb')
   data: RecordingEventData;
 

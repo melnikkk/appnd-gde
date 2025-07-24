@@ -27,7 +27,8 @@ export class RecordingEventsService {
     recordingId: string,
     events: Record<string, CreateRecordingEventDto>,
   ): Promise<Record<string, RecordingEvent>> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const userId = Object.values(events)[0]?.userId;
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -42,7 +43,7 @@ export class RecordingEventsService {
 
       for (const [eventId, eventData] of Object.entries(events)) {
         const eventModel = this.recordingEventFactoryService.createRecordingEvent(
-          eventData as RecordingEvent,
+          eventData as unknown as RecordingEvent,
         );
 
         if (eventModel.isScreenshotAvailable()) {
@@ -144,8 +145,9 @@ export class RecordingEventsService {
   async getEventById(
     recordingId: string,
     eventId: string,
+    userId: string,
   ): Promise<RecordingEvent | null> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -160,8 +162,8 @@ export class RecordingEventsService {
     );
   }
 
-  async deleteEvent(recordingId: string, eventId: string): Promise<void> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+  async deleteEvent(recordingId: string, eventId: string, userId: string): Promise<void> {
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -196,8 +198,9 @@ export class RecordingEventsService {
     recordingId: string,
     eventId: string,
     updateEventDto: Partial<RecordingEvent>,
+    userId: string,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -269,8 +272,9 @@ export class RecordingEventsService {
     recordingId: string,
     eventId: string,
     file: Express.Multer.File,
+    userId: string,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -326,8 +330,9 @@ export class RecordingEventsService {
   async regenerateEventScreenshot(
     recordingId: string,
     eventId: string,
+    userId: string,
   ): Promise<RecordingEvent> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -389,8 +394,11 @@ export class RecordingEventsService {
     }
   }
 
-  async generateRecordingEventsScreenshots(recordingId: string): Promise<void> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+  async generateRecordingEventsScreenshots(
+    recordingId: string,
+    userId: string,
+  ): Promise<void> {
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
@@ -444,9 +452,9 @@ export class RecordingEventsService {
     }
   }
 
-  async deleteAllEventsByRecordingId(recordingId: string): Promise<void> {
+  async deleteAllEventsByRecordingId(recordingId: string, userId: string): Promise<void> {
     try {
-      const recording = await this.recordingStoreService.findOne(recordingId);
+      const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
       if (!recording || !recording.events) {
         return;
@@ -473,9 +481,12 @@ export class RecordingEventsService {
     }
   }
 
-  async getAllEventsByRecordingId(recordingId: string): Promise<RecordingEventsRecord> {
+  async getAllEventsByRecordingId(
+    recordingId: string,
+    userId: string,
+  ): Promise<RecordingEventsRecord> {
     try {
-      const recording = await this.recordingStoreService.findOne(recordingId);
+      const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
       if (!recording) {
         throw new RecordingNotFoundException(recordingId);
@@ -500,8 +511,9 @@ export class RecordingEventsService {
 
   async generateAiContentForRecordingEvents(
     recordingId: string,
+    userId: string,
   ): Promise<RecordingEventsRecord> {
-    const recording = await this.recordingStoreService.findOne(recordingId);
+    const recording = await this.recordingStoreService.findOne(recordingId, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(recordingId);
