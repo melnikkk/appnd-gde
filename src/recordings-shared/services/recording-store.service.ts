@@ -6,6 +6,7 @@ import { STORAGE_PROVIDER } from '../../storage/interfaces/storage-provider.inte
 import { StorageProvider } from '../../storage/interfaces/storage-provider.interface';
 import { AppBaseException } from '../../common/exceptions/base.exception';
 import { RecordingNotFoundException } from '../../recordings/exceptions/recording-not-found.exception';
+import { UserNotFoundException } from '../../auth/exceptions/user-not-found.exception';
 
 @Injectable()
 export class RecordingStoreService {
@@ -18,10 +19,14 @@ export class RecordingStoreService {
     private readonly storageProvider: StorageProvider,
   ) {}
 
-  async findOne(id: string): Promise<Recording | null> {
+  async findOne(id: string, userId: string): Promise<Recording | null> {
+    if (!userId) {
+      throw UserNotFoundException.noAuthenticatedUser();
+    }
+
     try {
       const recording = await this.recordingsRepository.findOne({
-        where: { id },
+        where: { id, userId },
       });
 
       return recording;
@@ -54,9 +59,15 @@ export class RecordingStoreService {
     }
   }
 
-  findAll(): Promise<Array<Recording>> {
+  findAll(userId: string): Promise<Array<Recording>> {
+    if (!userId) {
+      throw UserNotFoundException.noAuthenticatedUser();
+    }
+
     try {
-      return this.recordingsRepository.find();
+      return this.recordingsRepository.find({
+        where: { userId },
+      });
     } catch (error) {
       this.logger.error(`Failed to fetch recordings: ${error.message}`, error.stack);
       throw new AppBaseException(
@@ -67,8 +78,8 @@ export class RecordingStoreService {
     }
   }
 
-  async remove(id: string): Promise<void> {
-    const recording = await this.findOne(id);
+  async remove(id: string, userId: string): Promise<void> {
+    const recording = await this.findOne(id, userId);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
@@ -123,9 +134,9 @@ export class RecordingStoreService {
     }
   }
 
-  async deleteAllEvents(recordingId: string): Promise<void> {
+  async deleteAllEvents(recordingId: string, userId: string): Promise<void> {
     try {
-      const recording = await this.findOne(recordingId);
+      const recording = await this.findOne(recordingId, userId);
 
       if (!recording || !recording.events) {
         return;
@@ -136,8 +147,6 @@ export class RecordingStoreService {
       if (eventIds.length === 0) {
         return;
       }
-
-      this.logger.log(`Clearing ${eventIds.length} events for recording ${recordingId}`);
 
       recording.events = {};
 

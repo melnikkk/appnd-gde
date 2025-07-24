@@ -32,6 +32,7 @@ export class RecordingsService {
   async create(
     createRecordingDto: CreateRecordingDto,
     file: Express.Multer.File,
+    userId: string,
   ): Promise<Recording> {
     const { id, data } = createRecordingDto;
 
@@ -43,6 +44,7 @@ export class RecordingsService {
       const viewData = parsedData.viewData;
       const recordingPartial: Partial<Recording> = {
         id,
+        userId,
         duration,
         startTime,
         stopTime,
@@ -101,9 +103,10 @@ export class RecordingsService {
   async update(
     id: string,
     updateRecordingDto: Partial<UpdateRecordingDto>,
+    userId: string,
   ): Promise<Recording> {
     try {
-      const recording = await this.recordingStoreService.findOne(id);
+      const recording = await this.recordingStoreService.findOne(id, userId);
 
       if (!recording) {
         throw new RecordingNotFoundException(id);
@@ -126,27 +129,30 @@ export class RecordingsService {
     }
   }
 
-  findAll(): Promise<Array<Recording>> {
-    return this.recordingStoreService.findAll();
+  findAll(userId: string): Promise<Array<Recording>> {
+    return this.recordingStoreService.findAll(userId);
   }
 
-  findOne(id: string): Promise<Recording | null> {
-    return this.recordingStoreService.findOne(id);
+  findOne(id: string, userId: string): Promise<Recording | null> {
+    return this.recordingStoreService.findOne(id, userId);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.recordingStoreService.deleteAllEvents(id);
+  async remove(id: string, userId: string): Promise<void> {
+    await this.recordingStoreService.deleteAllEvents(id, userId);
     await this.screenshotsService.deleteScreenshotsByRecordingId(id);
 
-    return this.recordingStoreService.remove(id);
+    return this.recordingStoreService.remove(id, userId);
   }
 
   getFilePath(key: string): string {
     return this.recordingStoreService.getFilePath(key);
   }
 
-  async exportRecordingAsStepGuide(recordingId: string): Promise<string | null> {
-    const recording = await this.findOne(recordingId);
+  async exportRecordingAsStepGuide(
+    recordingId: string,
+    userId: string,
+  ): Promise<string | null> {
+    const recording = await this.findOne(recordingId, userId);
 
     if (!recording) {
       return null;
@@ -160,10 +166,11 @@ export class RecordingsService {
 
   async generateEmbedCode(
     recordingId: string,
+    userId: string,
     width?: string,
     height?: string,
   ): Promise<string | null> {
-    const stepGuideContent = await this.exportRecordingAsStepGuide(recordingId);
+    const stepGuideContent = await this.exportRecordingAsStepGuide(recordingId, userId);
 
     if (!stepGuideContent) {
       return null;

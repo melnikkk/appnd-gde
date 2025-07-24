@@ -127,6 +127,9 @@ export class CreateRecordingEventDto {
   @IsNotEmpty()
   id: string;
 
+  @IsNotEmpty()
+  userId: string;
+
   @IsEnum(RecordingEventType)
   @IsNotEmpty()
   type: RecordingEventType;

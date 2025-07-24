@@ -18,6 +18,8 @@ import {
   StreamableFile,
   Query,
 } from '@nestjs/common';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { User } from '../../auth/interfaces/user.interface';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RecordingsService } from '../services/recordings.service';
 import {
@@ -53,6 +55,7 @@ export class RecordingsController {
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Body() createRecordingDto: CreateRecordingDto,
+    @CurrentUser() user: User,
   ): Promise<Recording> {
     if (!file) {
       throw InvalidFileUploadException.noFile();
@@ -62,7 +65,7 @@ export class RecordingsController {
       throw InvalidFileUploadException.invalidType();
     }
 
-    return await this.recordingsService.create(createRecordingDto, file);
+    return await this.recordingsService.create(createRecordingDto, file, user.id);
   }
 
   @Patch(':id')
@@ -70,14 +73,15 @@ export class RecordingsController {
   async updateRecording(
     @Param('id') id: string,
     @Body() updateRecordingDto: Partial<UpdateRecordingDto>,
+    @CurrentUser() user: User,
   ): Promise<Recording> {
-    const recording = await this.recordingsService.findOne(id);
+    const recording = await this.recordingsService.findOne(id, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
     }
 
-    return await this.recordingsService.update(id, updateRecordingDto);
+    return await this.recordingsService.update(id, updateRecordingDto, user.id);
   }
 
   @Get(':id/source')
@@ -85,8 +89,9 @@ export class RecordingsController {
     @Param('id') id: string,
     @Req() req: Request,
     @Res() res: Response,
+    @CurrentUser() user: User,
   ): Promise<void> {
-    const recording = await this.recordingsService.findOne(id);
+    const recording = await this.recordingsService.findOne(id, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
@@ -129,8 +134,9 @@ export class RecordingsController {
   async getThumbnail(
     @Param('id') id: string,
     @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: User,
   ): Promise<StreamableFile> {
-    const recording = await this.recordingsService.findOne(id);
+    const recording = await this.recordingsService.findOne(id, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
@@ -157,14 +163,14 @@ export class RecordingsController {
 
   @Get()
   @Header('X-Content-Type-Options', 'nosniff')
-  async findAll(): Promise<Array<GetRecordingResponseDto>> {
-    const recordings = await this.recordingsService.findAll();
+  async findAll(@CurrentUser() user: User): Promise<Array<GetRecordingResponseDto>> {
+    const recordings = await this.recordingsService.findAll(user.id);
 
     return recordings.map(
       ({ thumbnailPath, startTime, stopTime, duration, ...recording }) => ({
         ...recording,
         startTime: Number(startTime),
-        stopTime: stopTime !== null ? Number(stopTime) : null,
+        stopTime: stopTime ? Number(stopTime) : null,
         duration: Number(duration),
         sourceUrl: `/recordings/${recording.id}/source`,
         thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
@@ -176,8 +182,9 @@ export class RecordingsController {
   @Header('X-Content-Type-Options', 'nosniff')
   async findOne(
     @Param() { id }: GetRecordingRequestDto,
+    @CurrentUser() user: User,
   ): Promise<GetRecordingResponseDto> {
-    const recording = await this.recordingsService.findOne(id);
+    const recording = await this.recordingsService.findOne(id, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
@@ -188,7 +195,7 @@ export class RecordingsController {
     return {
       ...recordingData,
       startTime: Number(startTime),
-      stopTime: stopTime !== null ? Number(stopTime) : null,
+      stopTime: stopTime ? Number(stopTime) : null,
       duration: Number(duration),
       sourceUrl: `/recordings/${recording.id}/source`,
       thumbnailUrl: thumbnailPath ? `/recordings/${recording.id}/thumbnail` : null,
@@ -198,20 +205,29 @@ export class RecordingsController {
   @Delete('/:id')
   @Header('X-Content-Type-Options', 'nosniff')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param() { id }: DeleteRecordingDto): Promise<void> {
-    await this.recordingsService.remove(id);
+  async remove(
+    @Param() { id }: DeleteRecordingDto,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    await this.recordingsService.remove(id, user.id);
   }
 
   @Get(':id/guide')
   @Header('Content-Type', 'text/plain')
-  async exportRecordingAsStepGuide(@Param('id') id: string): Promise<string> {
-    const recording = await this.recordingsService.findOne(id);
+  async exportRecordingAsStepGuide(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ): Promise<string> {
+    const recording = await this.recordingsService.findOne(id, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
     }
 
-    const htmlContent = await this.recordingsService.exportRecordingAsStepGuide(id);
+    const htmlContent = await this.recordingsService.exportRecordingAsStepGuide(
+      id,
+      user.id,
+    );
 
     if (!htmlContent) {
       throw new AppBaseException(
@@ -230,16 +246,22 @@ export class RecordingsController {
   @Header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'")
   async getEmbedCode(
     @Param('id') id: string,
+    @CurrentUser() user: User,
     @Query('width') width?: string,
     @Query('height') height?: string,
   ): Promise<string> {
-    const recording = await this.recordingsService.findOne(id);
+    const recording = await this.recordingsService.findOne(id, user.id);
 
     if (!recording) {
       throw new RecordingNotFoundException(id);
     }
 
-    const embedCode = await this.recordingsService.generateEmbedCode(id, width, height);
+    const embedCode = await this.recordingsService.generateEmbedCode(
+      id,
+      user.id,
+      width,
+      height,
+    );
 
     if (!embedCode) {
       throw new AppBaseException(

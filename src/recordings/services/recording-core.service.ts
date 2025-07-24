@@ -94,16 +94,16 @@ export class RecordingCoreService {
     }
   }
 
-  findAll(): Promise<Array<Recording>> {
-    return this.recordingStoreService.findAll();
+  findAll(userId: string): Promise<Array<Recording>> {
+    return this.recordingStoreService.findAll(userId);
   }
 
-  findOne(id: string): Promise<Recording | null> {
-    return this.recordingStoreService.findOne(id);
+  findOne(id: string, userId: string): Promise<Recording | null> {
+    return this.recordingStoreService.findOne(id, userId);
   }
 
-  remove(id: string): Promise<void> {
-    return this.recordingStoreService.remove(id);
+  remove(id: string, userId: string): Promise<void> {
+    return this.recordingStoreService.remove(id, userId);
   }
 
   getFilePath(key: string): string {
@@ -114,7 +114,7 @@ export class RecordingCoreService {
     return this.recordingStoreService.save(recording);
   }
 
-  deleteAllEvents(recordingId: string): Promise<void> {
-    return this.recordingStoreService.deleteAllEvents(recordingId);
+  deleteAllEvents(recordingId: string, userId: string): Promise<void> {
+    return this.recordingStoreService.deleteAllEvents(recordingId, userId);
   }
 }
