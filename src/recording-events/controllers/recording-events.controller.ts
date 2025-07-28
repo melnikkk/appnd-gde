@@ -14,6 +14,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { Public } from '../../auth/decorators/public.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as fs from 'node:fs';
 import { Response } from 'express';
@@ -184,19 +185,18 @@ export class RecordingEventsController {
     }
   }
 
+  @Public()
   @Get(':recordingId/events/:eventId/screenshot')
   @Header('Content-Type', 'image/jpeg')
   async getEventScreenshot(
     @Param('recordingId') recordingId: string,
     @Param('eventId') eventId: string,
     @Res({ passthrough: true }) res: Response,
-    @CurrentUser() user: User,
   ): Promise<StreamableFile> {
     try {
-      const recordingEvent = await this.recordingEventsService.getEventById(
+      const recordingEvent = await this.recordingEventsService.getEventByIdPublic(
         recordingId,
         eventId,
-        user.id,
       );
 
       if (!recordingEvent) {
@@ -219,6 +219,7 @@ export class RecordingEventsController {
       const file = fs.createReadStream(screenshotPath);
       res.set({
         'Content-Disposition': `inline; filename="${eventId}.jpg"`,
+        'Cache-Control': 'public, max-age=86400',
       });
 
       return new StreamableFile(file);

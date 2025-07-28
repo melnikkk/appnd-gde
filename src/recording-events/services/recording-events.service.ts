@@ -162,6 +162,42 @@ export class RecordingEventsService {
     );
   }
 
+  async getEventByIdPublic(
+    recordingId: string,
+    eventId: string,
+  ): Promise<RecordingEvent | null> {
+    try {
+      const recording = await this.recordingStoreService.findOnePublic(recordingId);
+
+      if (!recording) {
+        throw new RecordingNotFoundException(recordingId);
+      }
+
+      if (!recording.events || !recording.events[eventId]) {
+        return null;
+      }
+
+      return this.recordingEventFactoryService.createRecordingEvent(
+        recording.events[eventId],
+      );
+    } catch (error) {
+      if (error instanceof RecordingNotFoundException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Failed to get public event ${eventId}: ${error.message}`,
+        error.stack,
+      );
+      throw new AppBaseException(
+        `Failed to fetch event with ID ${eventId}`,
+        500,
+        'FETCH_PUBLIC_EVENT_FAILED',
+        { recordingId, eventId },
+      );
+    }
+  }
+
   async deleteEvent(recordingId: string, eventId: string, userId: string): Promise<void> {
     const recording = await this.recordingStoreService.findOne(recordingId, userId);
 

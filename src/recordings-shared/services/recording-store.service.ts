@@ -42,6 +42,28 @@ export class RecordingStoreService {
     }
   }
 
+  async findOnePublic(id: string): Promise<Recording | null> {
+    try {
+      const recording = await this.recordingsRepository.findOne({
+        where: { id },
+      });
+
+      return recording;
+    } catch (error) {
+      this.logger.error(
+        `Failed to find public recording ${id}: ${error.message}`,
+        error.stack,
+      );
+
+      throw new AppBaseException(
+        `Failed to fetch public recording with ID ${id}`,
+        500,
+        'FETCH_PUBLIC_RECORDING_FAILED',
+        { recordingId: id },
+      );
+    }
+  }
+
   save(recording: Recording): Promise<Recording> {
     return this.recordingsRepository.save(recording);
   }
