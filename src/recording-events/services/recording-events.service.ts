@@ -565,7 +565,7 @@ export class RecordingEventsService {
     );
     const shouldGenerateAiContent = haveEvents && aiGeneratableRecordingEvents.length > 0;
 
-    if (shouldGenerateAiContent) {
+    if (!shouldGenerateAiContent) {
       return {};
     }
 
